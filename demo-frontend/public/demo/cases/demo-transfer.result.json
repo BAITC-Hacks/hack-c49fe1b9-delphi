@@ -1,0 +1,272 @@
+{
+  "id": "demo-transfer",
+  "mode": "synthetic",
+  "output_language": "ru",
+  "editions": {
+    "before": {
+      "label": "ред. 1"
+    },
+    "after": {
+      "label": "ред. 2 — after-audit.md и after-risk.md"
+    }
+  },
+  "units": [
+    {
+      "unit_id": "tr-unit-audit",
+      "name": "Отдел аудита",
+      "status": "changed",
+      "before": [
+        {
+          "document_id": "tr-before",
+          "edition": "ред. 1",
+          "clause_id": "1",
+          "clause_number": "1",
+          "side": "before",
+          "highlight": "Отдел аудита"
+        }
+      ],
+      "after": [
+        {
+          "document_id": "tr-audit",
+          "edition": "after-audit.md",
+          "clause_id": "1",
+          "clause_number": "1",
+          "side": "after",
+          "highlight": "Отдел аудита"
+        }
+      ],
+      "note": "Подразделение присутствует в обеих редакциях; ведение реестра рисков указано у другого исполнителя."
+    },
+    {
+      "unit_id": "tr-unit-risk",
+      "name": "Служба рисков",
+      "status": "new",
+      "before": [],
+      "after": [
+        {
+          "document_id": "tr-risk",
+          "edition": "after-risk.md",
+          "clause_id": "1",
+          "clause_number": "1",
+          "side": "after",
+          "highlight": "Служба рисков"
+        }
+      ],
+      "note": "Указана в отдельном документе комплекта «После». Отсутствие в предоставленном документе «До» не означает, что подразделения раньше не существовало."
+    }
+  ],
+  "functions": [
+    {
+      "id": "risk-register-transferred-across-documents",
+      "title": "Ведение реестра операционных рисков",
+      "status": "transferred",
+      "before": [
+        {
+          "unit": "Отдел аудита",
+          "owners": [
+            "Отдел аудита"
+          ],
+          "refs": [
+            {
+              "document_id": "tr-before",
+              "edition": "ред. 1",
+              "clause_id": "1.1",
+              "clause_number": "1.1",
+              "side": "before",
+              "highlight": "Отдел аудита обязан ежемесячно обновлять реестр операционных рисков всей компании."
+            }
+          ],
+          "summary": "Ежемесячно обновлять реестр операционных рисков всей компании."
+        }
+      ],
+      "after": [
+        {
+          "unit": "Служба рисков",
+          "owners": [
+            "Служба рисков"
+          ],
+          "refs": [
+            {
+              "document_id": "tr-risk",
+              "edition": "after-risk.md",
+              "clause_id": "1.1",
+              "clause_number": "1.1",
+              "side": "after",
+              "highlight": "Служба рисков обязана ежемесячно обновлять реестр операционных рисков всей компании."
+            }
+          ],
+          "summary": "Ежемесячно обновлять реестр операционных рисков всей компании."
+        }
+      ],
+      "evidence": {
+        "before": [
+          {
+            "document_id": "tr-before",
+            "edition": "ред. 1",
+            "clause_id": "1.1",
+            "clause_number": "1.1",
+            "side": "before",
+            "highlight": "Отдел аудита обязан ежемесячно обновлять реестр операционных рисков всей компании."
+          }
+        ],
+        "after": [
+          {
+            "document_id": "tr-risk",
+            "edition": "after-risk.md",
+            "clause_id": "1.1",
+            "clause_number": "1.1",
+            "side": "after",
+            "highlight": "Служба рисков обязана ежемесячно обновлять реестр операционных рисков всей компании."
+          }
+        ],
+        "context": []
+      },
+      "note": "В представленном комплекте обязанность ежемесячно обновлять реестр операционных рисков всей компании указана у службы рисков в отдельном документе «После». По сравнению с редакцией «До» изменился исполнитель; периодичность и охват сохранены.",
+      "recommendation": "Сопоставьте оба пункта и подтвердите передачу обязанности от отдела аудита службе рисков.",
+      "review": {
+        "status": "unreviewed"
+      }
+    },
+    {
+      "id": "cash-review-retained",
+      "title": "Проверка кассовых операций",
+      "status": "kept",
+      "before": [
+        {
+          "unit": "Отдел аудита",
+          "owners": [
+            "Отдел аудита"
+          ],
+          "refs": [
+            {
+              "document_id": "tr-before",
+              "edition": "ред. 1",
+              "clause_id": "1.2",
+              "clause_number": "1.2",
+              "side": "before",
+              "highlight": "Отдел аудита обязан ежеквартально проверять кассовые операции всей компании."
+            }
+          ],
+          "summary": "Ежеквартально проверять кассовые операции всей компании."
+        }
+      ],
+      "after": [
+        {
+          "unit": "Отдел аудита",
+          "owners": [
+            "Отдел аудита"
+          ],
+          "refs": [
+            {
+              "document_id": "tr-audit",
+              "edition": "after-audit.md",
+              "clause_id": "1.1",
+              "clause_number": "1.1",
+              "side": "after",
+              "highlight": "Отдел аудита обязан ежеквартально проверять кассовые операции всей компании."
+            }
+          ],
+          "summary": "Ежеквартально проверять кассовые операции всей компании."
+        }
+      ],
+      "evidence": {
+        "before": [
+          {
+            "document_id": "tr-before",
+            "edition": "ред. 1",
+            "clause_id": "1.2",
+            "clause_number": "1.2",
+            "side": "before",
+            "highlight": "Отдел аудита обязан ежеквартально проверять кассовые операции всей компании."
+          }
+        ],
+        "after": [
+          {
+            "document_id": "tr-audit",
+            "edition": "after-audit.md",
+            "clause_id": "1.1",
+            "clause_number": "1.1",
+            "side": "after",
+            "highlight": "Отдел аудита обязан ежеквартально проверять кассовые операции всей компании."
+          }
+        ],
+        "context": []
+      },
+      "note": "Обязанность отдела аудита ежеквартально проверять кассовые операции всей компании сохранена. Изменился номер пункта: 1.2 → 1.1.",
+      "recommendation": "Проверьте совпадение исполнителя, периодичности и охвата по цитатам; перенумерация сама по себе не означает изменение обязанности.",
+      "review": {
+        "status": "unreviewed"
+      }
+    }
+  ],
+  "risks": [],
+  "conclusion": {
+    "sections": [
+      {
+        "title": "Передача функций",
+        "items": [
+          {
+            "finding_id": "risk-register-transferred-across-documents",
+            "text": "Обязанность вести реестр операционных рисков указана у службы рисков вместо отдела аудита; соответствие найдено в другом документе комплекта «После».",
+            "refs": [
+              {
+                "document_id": "tr-before",
+                "edition": "ред. 1",
+                "clause_id": "1.1",
+                "clause_number": "1.1",
+                "side": "before",
+                "highlight": "Отдел аудита обязан ежемесячно обновлять реестр операционных рисков всей компании."
+              },
+              {
+                "document_id": "tr-risk",
+                "edition": "after-risk.md",
+                "clause_id": "1.1",
+                "clause_number": "1.1",
+                "side": "after",
+                "highlight": "Служба рисков обязана ежемесячно обновлять реестр операционных рисков всей компании."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Сохранённые функции",
+        "items": [
+          {
+            "finding_id": "cash-review-retained",
+            "text": "Ежеквартальная проверка кассовых операций всей компании сохранена за отделом аудита; пункт перенумерован с 1.2 на 1.1.",
+            "refs": [
+              {
+                "document_id": "tr-before",
+                "edition": "ред. 1",
+                "clause_id": "1.2",
+                "clause_number": "1.2",
+                "side": "before",
+                "highlight": "Отдел аудита обязан ежеквартально проверять кассовые операции всей компании."
+              },
+              {
+                "document_id": "tr-audit",
+                "edition": "after-audit.md",
+                "clause_id": "1.1",
+                "clause_number": "1.1",
+                "side": "after",
+                "highlight": "Отдел аудита обязан ежеквартально проверять кассовые операции всей компании."
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "limitations": [
+      "Синтетический контрольный пример: тестовый материал, не относится к документам Казахтелекома. Результат подготовлен вручную по manifest.json, это не запуск модели.",
+      "Сопоставлены оба документа комплекта «После»: after-audit.md и after-risk.md. Вывод ограничен предоставленным тестовым комплектом.",
+      "Находки требуют проверки человеком; отметки проверки в файле не выставлены."
+    ]
+  },
+  "trace": [],
+  "coverage": {
+    "complete": true,
+    "processed": 13,
+    "total": 13
+  }
+}

@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { AlertTriangle, ShieldCheck } from "lucide-react";
+import { reviewQueue, riskSummary } from "@/lib/evidence";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { AlertTriangle, ListChecks, ShieldCheck } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,18 +13,39 @@ import { ExportMenu } from "@/components/ExportMenu";
 import { FunctionMapTable } from "@/components/FunctionMapTable";
 import { RiskCard } from "@/components/RiskCard";
 import { StatusChip } from "@/components/StatusChip";
+import { SummaryTiles } from "@/components/SummaryTiles";
 import { TracePanel } from "@/components/TracePanel";
 import { UnitTable } from "@/components/UnitTable";
 import { useAnalysis } from "@/hooks/useAnalysis";
-import { DEMO_ID } from "@/lib/api";
+import { buildQueue } from "@/hooks/useReviewQueue";
+import { DEMO_ID, saveReview } from "@/lib/api";
+import { plural } from "@/lib/adapter";
 import { UNIT_STATUS } from "@/lib/status";
-import type { EvidenceRequest, UnitStatus } from "@/types";
+import type { EvidenceRequest, ReviewStatus, UnitStatus } from "@/types";
 
 export default function AnalysisPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data, error, loading, reload } = useAnalysis(id);
+  const { data, error, loading, reload, replace } = useAnalysis(id);
+  const [params, setParams] = useSearchParams();
+  const findingId = params.get("finding");
   const [evidence, setEvidence] = useState<EvidenceRequest | null>(null);
+
+  useEffect(() => {
+    if (data && findingId) setEvidence(reviewQueue(data).find((f) => f.finding_id === findingId) ?? null);
+  }, [data, findingId]);
+  /** Scenario H: stored on the server; the page is rebuilt from the saved bundle, not refetched. */
+  const onReview = async (findingId: string, status: ReviewStatus, note: string) => {
+    if (!id) return;
+    const next = await saveReview(id, findingId, status, note);
+    if (next) replace(next);
+  };
+
+  /** Questions still waiting for a human decision: the entry into the review queue. */
+  const openQuestions = useMemo(
+    () => (data ? buildQueue(data).filter((i) => i.question && i.review.status === "unreviewed").length : 0),
+    [data],
+  );
 
   const unitCounts = useMemo(() => {
     const counts: Partial<Record<UnitStatus, number>> = {};
@@ -86,7 +108,8 @@ export default function AnalysisPage() {
             <AlertTriangle className="size-4" aria-hidden="true" />
             <AlertTitle>Частичный результат</AlertTitle>
             <AlertDescription>
-              Стадия {data.partial.failed_stage} не завершена: {data.partial.message}. Показано то, что удалось посчитать.
+              {data.partial.failed_stage ? `Стадия ${data.partial.failed_stage} не завершена: ` : ""}
+              {data.partial.message}. Показано то, что удалось посчитать; подробности — в разделе «Ограничения» заключения.
             </AlertDescription>
           </Alert>
         )}
@@ -95,16 +118,26 @@ export default function AnalysisPage() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Результаты сравнения</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {data.units.length} подразделений · {data.functions.length} функций · {data.risks.length} вопросов для проверки
+              {data.units.length} {plural(data.units.length, "подразделение", "подразделения", "подразделений")} ·{" "}
+              {data.functions.length} {plural(data.functions.length, "функция", "функции", "функций")} · {data.risks.length}{" "}
+              {plural(data.risks.length, "вопрос", "вопроса", "вопросов")} для проверки
               {missingCount > 0 && ` · ${missingCount} без найденного соответствия`}
             </p>
           </div>
-          <div className="no-print">
+          <div className="no-print flex flex-wrap gap-2">
+            <Button asChild size="sm" className="gap-1.5">
+              <Link to={`/analyses/${encodeURIComponent(id ?? DEMO_ID)}/review`}>
+                <ListChecks className="size-4" aria-hidden="true" />
+                {openQuestions > 0 ? `Проверить выводы (${openQuestions})` : "Очередь проверки"}
+              </Link>
+            </Button>
             <ExportMenu result={data} />
           </div>
         </div>
 
-        <Tabs defaultValue="structure" className="gap-4">
+        <SummaryTiles result={data} analysisId={id ?? DEMO_ID} />
+
+        <Tabs defaultValue={findingId ? "functions" : "structure"} className="gap-4">
           <TabsList className="no-print w-full justify-start overflow-x-auto sm:w-auto">
             <TabsTrigger value="structure">Структура</TabsTrigger>
             <TabsTrigger value="functions">Функции и риски</TabsTrigger>
@@ -135,14 +168,14 @@ export default function AnalysisPage() {
               {data.risks.length === 0 ? (
                 <p className="flex items-center gap-2 rounded-lg border bg-card px-4 py-3 text-sm text-muted-foreground">
                   <ShieldCheck className="size-4" aria-hidden="true" />
-                  Дублирований и конфликтов не выявлено — это результат проверки, а не отсутствие проверки.
+                  {riskSummary(data)}
                 </p>
               ) : (
                 <div className="flex flex-col gap-3">
                   {data.risks.map((r) => (
                     <RiskCard key={r.id} risk={r} onEvidence={setEvidence} />
                   ))}
-                  {!data.risks.some((r) => r.kind === "conflict") && (
+                  {data.coverage?.complete && !data.risks.some((r) => r.kind === "conflict") && (
                     <p className="text-xs text-muted-foreground">
                       Признаков конфликта интересов в предоставленном комплекте не выявлено.
                     </p>
@@ -157,10 +190,23 @@ export default function AnalysisPage() {
           </TabsContent>
         </Tabs>
 
-        <TracePanel trace={data.trace} />
+        <TracePanel
+          trace={data.trace}
+          note={
+            data.mode === "live" || data.mode === "partial"
+              ? undefined
+              : "Пример того, как агент проходит стадии и вызывает инструменты. Это не запись живого запуска: в демо модель не вызывается, числа и время условные."
+          }
+        />
       </div>
 
-      <EvidenceDrawer request={evidence} analysisId={id ?? DEMO_ID} onClose={() => setEvidence(null)} />
+      <EvidenceDrawer
+        request={evidence?.finding_id ? reviewQueue(data).find((f) => f.finding_id === evidence.finding_id) ?? evidence : evidence}
+        analysisId={id ?? DEMO_ID}
+        onClose={() => { setEvidence(null); const next = new URLSearchParams(params); next.delete("finding"); setParams(next, { replace: true }); }}
+        onRetry={reload}
+        onReview={onReview}
+      />
     </AppShell>
   );
 }

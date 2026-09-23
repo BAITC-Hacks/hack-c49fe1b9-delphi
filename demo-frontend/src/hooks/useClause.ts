@@ -7,6 +7,7 @@ export function useClause(ref: ClauseRef | undefined, analysisId: string) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!!ref);
 
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!ref) return;
     let cancelled = false;
@@ -25,7 +26,7 @@ export function useClause(ref: ClauseRef | undefined, analysisId: string) {
     return () => {
       cancelled = true;
     };
-  }, [ref?.document_id, ref?.clause_id, analysisId]);
+  }, [ref?.document_id, ref?.clause_id, analysisId, attempt]);
 
-  return { clause, error, loading };
+  return { clause, error, loading, reload: () => setAttempt((a) => a + 1) };
 }

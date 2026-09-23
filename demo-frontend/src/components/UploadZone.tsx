@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const ACCEPT = [".docx", ".pdf", ".md", ".xlsx", ".txt"];
+const ACCEPT = [".docx", ".pdf", ".md", ".xlsx"]; // formats the backend parses (backend/app/parsers)
 
 interface Props {
   side: "before" | "after";
