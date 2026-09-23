@@ -1,3 +1,4 @@
+import { riskEvidence } from "@/lib/evidence";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { RefButton } from "@/components/RefButton";
 import { ReviewChip } from "@/components/ReviewControls";
@@ -11,19 +12,7 @@ interface Props {
 }
 
 export function RiskCard({ risk, onEvidence }: Props) {
-  // Live overlaps have both sides in «После»; without a side, a is «До» and b is «После» (demo).
-  const refs = risk.a.ref.clause_id === risk.b.ref.clause_id ? [risk.a.ref] : [risk.a.ref, risk.b.ref];
-  const sideOf = (i: number) => refs[i].side ?? (i === 0 ? "before" : "after");
-  const open = () =>
-    onEvidence({
-      title: risk.title,
-      kind: "risk",
-      status: risk.kind,
-      before: refs.filter((_, i) => sideOf(i) === "before"),
-      after: refs.filter((_, i) => sideOf(i) === "after"),
-      finding_id: risk.id,
-      review: risk.review,
-    });
+  const open = () => onEvidence(riskEvidence(risk));
 
   return (
     <Card className="animate-in fade-in slide-in-from-bottom-1 duration-150">
@@ -36,12 +25,12 @@ export function RiskCard({ risk, onEvidence }: Props) {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="grid gap-3 md:grid-cols-2">
-          {[risk.a, risk.b].map((side, i) => (
+          {risk.sides.map((side, i) => (
             <div key={i} className="rounded-md border bg-muted/40 p-3">
               <p className="text-sm font-medium">{side.unit}</p>
               {side.summary && <p className="mt-0.5 text-sm text-muted-foreground">{side.summary}</p>}
               <div className="mt-2">
-                <RefButton ref_={side.ref} onClick={open} />
+                {side.refs.map((ref, j) => <RefButton key={j} ref_={ref} onClick={open} />)}
               </div>
             </div>
           ))}

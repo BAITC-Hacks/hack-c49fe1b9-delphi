@@ -24,6 +24,7 @@ export function ReviewChip({ review, className }: { review?: Review; className?:
 interface Props {
   findingId: string;
   review?: Review;
+  canConfirm?: boolean;
   onSave(findingId: string, status: ReviewStatus, note: string): Promise<void>;
 }
 
@@ -34,7 +35,7 @@ const ACTIONS: { status: ReviewStatus; label: string; icon: typeof Check }[] = [
 ];
 
 /** Scenario H: the analyst confirms, questions or rejects an AI finding; saved on the server with a note. */
-export function ReviewControls({ findingId, review, onSave }: Props) {
+export function ReviewControls({ findingId, review, onSave, canConfirm = true }: Props) {
   const [saved, setSaved] = useState<Review>(review ?? { status: "unreviewed" });
   const [note, setNote] = useState(review?.note ?? "");
   const [saving, setSaving] = useState<ReviewStatus | null>(null);
@@ -66,6 +67,7 @@ export function ReviewControls({ findingId, review, onSave }: Props) {
         <h3 className="text-sm font-medium">Проверка человеком</h3>
         <ReviewChip review={saved} />
       </div>
+      {!canConfirm && <p className="text-xs text-status-missing-fg">Подтверждение недоступно: проверьте полноту источников и поиска. Можно оставить вопрос или отклонить вывод.</p>}
       <textarea
         value={note}
         onChange={(e) => setNote(e.target.value)}
@@ -82,7 +84,7 @@ export function ReviewControls({ findingId, review, onSave }: Props) {
             size="sm"
             variant={saved.status === status ? "default" : "outline"}
             aria-pressed={saved.status === status}
-            disabled={saving !== null}
+            disabled={saving !== null || (status === "confirmed" && !canConfirm)}
             onClick={() => save(status)}
             className="gap-1.5"
           >

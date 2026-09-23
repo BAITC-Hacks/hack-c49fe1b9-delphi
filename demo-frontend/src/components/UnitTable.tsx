@@ -20,16 +20,16 @@ export function UnitTable({ units, onEvidence }: Props) {
       title: u.name,
       kind: "unit",
       status: u.status,
-      before: u.before ? [u.before] : [],
-      after: u.after ? [u.after] : [],
+      before: u.before,
+      after: u.after,
     });
 
   return (
     <div className="overflow-x-auto rounded-lg border bg-card">
-      <Table>
+      <Table className="table-fixed">
         <TableHeader>
           <TableRow>
-            <TableHead className="min-w-[280px]">Подразделение</TableHead>
+            <TableHead className="w-[30%]">Подразделение</TableHead>
             <TableHead>Статус</TableHead>
             <TableHead className="hidden md:table-cell">Подчинённость</TableHead>
             <TableHead>Источник «До»</TableHead>
@@ -51,8 +51,8 @@ export function UnitTable({ units, onEvidence }: Props) {
                 <StatusChip status={u.status} kind="unit" />
               </TableCell>
               <TableCell className="hidden text-muted-foreground md:table-cell">{u.parent ?? "—"}</TableCell>
-              <TableCell>{u.before ? <RefButton ref_={u.before} onClick={() => open(u)} /> : <span className="text-muted-foreground">—</span>}</TableCell>
-              <TableCell>{u.after ? <RefButton ref_={u.after} onClick={() => open(u)} /> : <span className="text-muted-foreground">—</span>}</TableCell>
+              <TableCell>{u.before.length ? u.before.map((ref, i) => <RefButton key={i} ref_={ref} onClick={() => open(u)} />) : <span className="text-muted-foreground">—</span>}</TableCell>
+              <TableCell>{u.after.length ? u.after.map((ref, i) => <RefButton key={i} ref_={ref} onClick={() => open(u)} />) : <span className="text-muted-foreground">—</span>}</TableCell>
             </TableRow>
           ))}
         </TableBody>

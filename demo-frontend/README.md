@@ -78,6 +78,32 @@ public/demo/          result.json, clauses.json — офлайн-пример
 | Возможность | Оценка | Комментарий |
 |---|---|---|
 | RU / ҚАЗ / EN интерфейс (i18next) | 40 мин + вычитка KK | Сейчас только RU. Казахский требует проверки носителем — иначе заявлять нельзя |
-| Ссылка на вывод `?finding=<id>` | 15 мин | Открыть вкладку и строку по параметру |
+| Очередь проверки с фильтром в URL | отдельная ветка `nurdaulet-review-queue` | Прямая ссылка `?finding=<id>` уже открывает источники на текущем экране |
 | Соседние пункты в панели источников | 15 мин | Поле `parent` уже показывается |
 | Язык результата при запуске | 10 мин | Поле в форме `/new` |
+
+
+## Контракт доказательств для очереди (23 сентября 2026)
+
+База интеграции: `nurdaulet-api-integration` (PR #2). Сырые `Api*` и backend API не изменены. Компоненты используют UI-модель из `src/types.ts`; `public/demo/result.json` переведён в тот же формат.
+
+| Поле | Контракт |
+|---|---|
+| `functions[].before`, `after` | Всегда массивы `FunctionSide[]`, включая пустой массив |
+| `FunctionSide` | `{ function_id?, owners: string[], unit: string, refs: ClauseRef[], summary: string }`; `unit` — готовая подпись всех исполнителей, `refs` — все источники |
+| `risks[].sides` | Все участники `RiskSide[]`; прежних `a/b` нет. Те же `owners`, `unit`, `refs`, необязательные `summary` и `function_id` |
+| `functions[].search` | Для потенциально отсутствующей функции: `{ complete, reviewed, candidates, errors: string[], text }`. Логику строить по `complete`, а не разбирать `text`. При отсутствии сохранённого покрытия `complete: false` |
+| `functions[].evidence`, `risks[].evidence` | `{ before: ClauseRef[], after: ClauseRef[], context: ClauseRef[], error?: string }`. Ошибка загрузки не означает отсутствие соответствия. Ссылки из сторон функции и evidence дополняют друг друга |
+| `ClauseRef` | Прежние идентификаторы, `highlight`, `side` плюс `start_offset/end_offset`. Offsets считают Unicode code points, конец исключительный. `ClauseFragment` сам переводит их в UTF-16; не пересчитывать в очереди |
+| `result.coverage` | `{ complete: boolean, processed: number, total: number }`; разрешено утверждать полноту только при `complete === true`. В демо флаг может отсутствовать |
+| `units[].before`, `after` | Массивы `ClauseRef[]`; источники структуры тоже не обрезаются |
+| `result.structureFindings` | Дополнительные findings изменения структуры с `finding_id`, источниками и review; не путать с обзорными строками `units[]` |
+| `saveReview(...)` | После успешного сохранения возвращает `AnalysisResult`; при ошибке выбрасывает исключение |
+
+`id/title/status/note/recommendation/review`, `result.live`, `editions`, `mode`, `partial.failed_stage` и интерфейс `ClauseFragment({ ref_, analysisId })` сохранены. Цитаты всегда исходные, не переводятся и не подменяются пояснением модели.
+
+`src/lib/evidence.ts`: `functionEvidence`, `riskEvidence` объединяют полный набор ссылок; `reviewQueue` собирает уникальные findings по ID для существующей панели и экспорта. Порядок и фильтры новой очереди остаются в `hooks/useReviewQueue.ts`. `uniqueRefs` различает одинаковые цитаты с разными offsets. Не копировать только `sides[].refs[0]`.
+
+У пересечения функций оба набора могут принадлежать «После»: не рисовать пустое «До» как отсутствие соответствия. Контекст показывать отдельным блоком. При `evidence.error` — предупреждение и повтор загрузки, а не молчаливый fallback. При неверных offsets показать весь пункт и предупреждение; строковый поиск допускается только без offsets и при единственном совпадении.
+
+Проверки: `npm test` (Node test runner + уже установленный TypeScript), `npm run build`. Живой AI-анализ этими проверками не запускается.

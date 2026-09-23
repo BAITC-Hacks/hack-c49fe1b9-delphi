@@ -1,3 +1,4 @@
+import { functionEvidence } from "@/lib/evidence";
 import { useMemo, useState } from "react";
 import { ListFilter, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -5,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EmptyState } from "@/components/EmptyState";
-import { RefButton } from "@/components/RefButton";
 import { ReviewChip } from "@/components/ReviewControls";
 import { StatusChip } from "@/components/StatusChip";
 import { confidenceHint, percent } from "@/lib/format";
@@ -53,10 +53,7 @@ export function FunctionMapTable({ functions, onEvidence }: Props) {
         const hay = [
           f.title,
           f.note ?? "",
-          f.before?.unit ?? "",
-          f.before?.summary ?? "",
-          f.before?.ref.clause_number ?? "",
-          ...(f.after ?? []).flatMap((a) => [a.unit, a.summary, a.ref.clause_number]),
+          ...[...f.before, ...f.after].flatMap((a) => [a.unit, a.summary, ...a.refs.map((r) => r.clause_number)]),
         ]
           .join(" ")
           .toLowerCase();
@@ -79,17 +76,7 @@ export function FunctionMapTable({ functions, onEvidence }: Props) {
       return next;
     });
 
-  const open = (f: FunctionMapping) =>
-    onEvidence({
-      title: f.title,
-      kind: "function",
-      status: f.status,
-      before: f.before ? [f.before.ref] : [],
-      after: (f.after ?? []).map((a) => a.ref),
-      note: f.search,
-      finding_id: f.id,
-      review: f.review,
-    });
+  const open = (f: FunctionMapping) => onEvidence(functionEvidence(f));
 
   return (
     <div className="flex flex-col gap-3">
@@ -149,14 +136,14 @@ export function FunctionMapTable({ functions, onEvidence }: Props) {
         <>
           {/* Desktop */}
           <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
-            <Table>
+            <Table className="table-fixed w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-[260px]">Функция («До»)</TableHead>
-                  <TableHead className="min-w-[220px]">Исполнитель «После»</TableHead>
-                  <TableHead>Статус</TableHead>
-                  <TableHead>Уверенность</TableHead>
-                  <TableHead>Источник</TableHead>
+                  <TableHead className="w-[31%]">Функция («До»)</TableHead>
+                  <TableHead className="w-[25%]">Исполнитель «После»</TableHead>
+                  <TableHead className="w-[20%]">Статус</TableHead>
+                  <TableHead className="w-[12%]">Уверенность</TableHead>
+                  <TableHead className="w-[12%]">Источник</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -168,9 +155,9 @@ export function FunctionMapTable({ functions, onEvidence }: Props) {
                   >
                     <TableCell className="align-top">
                       <p className="font-medium">{f.title}</p>
-                      {f.before && (
+                      {f.before.length > 0 && (
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          {f.before.unit} · <span className="font-mono">п. {f.before.ref.clause_number}</span>
+                          {f.before.map((s) => s.unit).join("; ")} · <span className="font-mono">п. {f.before.flatMap((s) => s.refs.map((r) => r.clause_number)).join("; ")}</span>
                         </p>
                       )}
                       {f.note && <p className="mt-1 max-w-prose text-xs text-muted-foreground">{f.note}</p>}
@@ -180,7 +167,7 @@ export function FunctionMapTable({ functions, onEvidence }: Props) {
                         <ul className="flex flex-col gap-1">
                           {f.after.map((a, j) => (
                             <li key={j} className="text-sm">
-                              {a.unit} · <span className="font-mono text-xs text-muted-foreground">п. {a.ref.clause_number}</span>
+                              {a.unit} · <span className="font-mono text-xs text-muted-foreground">п. {a.refs.map((r) => r.clause_number).join("; ")}</span>
                             </li>
                           ))}
                         </ul>
@@ -199,7 +186,7 @@ export function FunctionMapTable({ functions, onEvidence }: Props) {
                     </TableCell>
                     <TableCell className="align-top">
                       <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => open(f)}>
-                        Открыть источник
+                        Источник
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -212,22 +199,22 @@ export function FunctionMapTable({ functions, onEvidence }: Props) {
           <ul className="flex flex-col gap-2 md:hidden">
             {rows.map((f) => (
               <li key={f.id} className={cn("rounded-lg border bg-card p-3", f.review?.status === "rejected" && "opacity-60")}>
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex flex-col items-start gap-2">
                   <p className="font-medium">{f.title}</p>
-                  <div className="flex flex-col items-end gap-1">
+                  <div className="flex flex-wrap items-start gap-1">
                     <StatusChip status={f.status} />
                     <ReviewChip review={f.review} />
                   </div>
                 </div>
-                {f.before && (
+                {f.before.length > 0 && (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    До: {f.before.unit} · <span className="font-mono">п. {f.before.ref.clause_number}</span>
+                    До: {f.before.map((s) => s.unit).join("; ")} · <span className="font-mono">п. {f.before.flatMap((s) => s.refs.map((r) => r.clause_number)).join("; ")}</span>
                   </p>
                 )}
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   После:{" "}
                   {f.after && f.after.length > 0
-                    ? f.after.map((a) => `${a.unit} · п. ${a.ref.clause_number}`).join("; ")
+                    ? f.after.map((a) => `${a.unit} · п. ${a.refs.map((r) => r.clause_number).join("; ")}`).join("; ")
                     : "соответствие не найдено"}
                 </p>
                 {f.note && <p className="mt-1 text-xs text-muted-foreground">{f.note}</p>}
@@ -245,10 +232,7 @@ export function FunctionMapTable({ functions, onEvidence }: Props) {
       <p className="text-xs text-muted-foreground">
         Показано {rows.length} из {functions.length}. Строки «Соответствие не найдено» — первыми: это то, что проверяет человек.
       </p>
-      <span className="sr-only">
-        {/* keep RefButton import used on mobile too */}
-        {rows[0]?.before && <RefButton ref_={rows[0].before.ref} onClick={() => open(rows[0])} />}
-      </span>
+
     </div>
   );
 }

@@ -22,20 +22,23 @@ const STATE_LABEL: Record<string, string> = {
 export default function HistoryPage() {
   const navigate = useNavigate();
   const [items, setItems] = useState<AnalysisSummary[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [health, setHealth] = useState<ApiHealth | "down" | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setError(null); setItems(null);
     listAnalyses()
       .then((list) => !cancelled && setItems(list))
-      .catch(() => !cancelled && setItems([])); // backend absent → empty history, UI still usable
+      .catch((e) => { if (!cancelled) { setError(e instanceof Error ? e.message : "Не удалось загрузить историю"); setItems([]); } });
     getHealth()
       .then((h) => !cancelled && setHealth(h))
       .catch(() => !cancelled && setHealth("down"));
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
   const hasDocs = items?.some((a) => a.documents_before != null || a.documents_after != null) ?? false;
   const hasQuestions = items?.some((a) => a.open_questions != null) ?? false;
@@ -81,7 +84,7 @@ export default function HistoryPage() {
           </div>
         </div>
 
-        {items === null ? (
+        {error ? <div role="alert" className="space-y-3 rounded-xl border bg-card p-6"><h2 className="font-semibold">Не удалось загрузить историю</h2><p className="text-sm text-muted-foreground">{error}</p><Button variant="outline" onClick={() => setAttempt((a) => a + 1)}>Повторить</Button></div> : items === null ? (
           <p className="text-sm text-muted-foreground">Загрузка истории…</p>
         ) : items.length === 0 ? (
           <EmptyState

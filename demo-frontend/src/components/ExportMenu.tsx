@@ -11,13 +11,14 @@ import { functionsCsvUrl, reportUrl } from "@/lib/api";
 import { buildCsv, buildHtml, download } from "@/lib/export";
 import type { AnalysisResult } from "@/types";
 
-/** Prints the whole report (all tabs), not the currently visible tab. Falls back to window.print if pop-ups are blocked. */
+/** Prints the whole report (all tabs), not the currently visible tab. Downloads the complete HTML report if pop-ups are blocked. */
 function printReport(result: AnalysisResult) {
-  const w = window.open("", "_blank", "noopener");
+  const w = window.open("", "_blank");
   if (!w) {
-    window.print();
+    download("delphi-report.html", buildHtml(result), "text/html;charset=utf-8");
     return;
   }
+  w.opener = null;
   w.document.open();
   w.document.write(buildHtml(result));
   w.document.close();

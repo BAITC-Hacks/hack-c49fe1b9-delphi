@@ -28,6 +28,7 @@ import type {
   UnitStatus,
 } from "@/types";
 import { FUNCTION_STATUS, REVIEW_STATUS, RISK_KIND } from "@/lib/status";
+import { uniqueRefs, refsOfSides } from "@/lib/evidence";
 
 /*
  * Maps the backend's granular API (backend/openapi.json) onto the UI contract in types.ts.
@@ -220,7 +221,7 @@ export function describeSearch(s: ApiSearchCoverage | null): string | undefined 
   const candidates = s.candidate_source_ids.length
     ? ` Рассмотрено кандидатов: ${s.candidate_source_ids.length}.`
     : "";
-  if (s.complete && !s.input_partial) return `${scope}, полный: да.${candidates}`;
+  if (s.complete && !s.input_partial && !s.errors.length) return `${scope}, полный: да.${candidates}`;
   const why = s.input_partial ? " Часть текста «После» прочитана не полностью." : "";
   const errors = s.errors.length ? ` Ошибки поиска: ${s.errors.join("; ")}.` : "";
   return `${scope}, полный: нет — это неполная проверка, а не «не найдено».${why}${errors}${candidates}`;
@@ -250,6 +251,7 @@ export function toAnalysisResult(b: LiveBundle): AnalysisResult {
 
   const refForSource = (sourceId: string, highlight?: string): ClauseRef => {
     const src = b.sources[sourceId];
+    if (!src) throw new Error(`Не найден исходный фрагмент ${sourceId}. Обновите результат.`);
     const doc = src ? docById.get(src.document_id) : undefined;
     return {
       document_id: src?.document_id ?? "",
@@ -266,30 +268,37 @@ export function toAnalysisResult(b: LiveBundle): AnalysisResult {
     clause_id: e.source_id,
     clause_number: e.clause_no ?? "б/н",
     highlight: e.excerpt || undefined,
+    start_offset: e.start_offset,
+    end_offset: e.end_offset,
     side: e.side,
   });
   const unitName = (ids: string[]): string | undefined =>
-    ids.map((id) => unitById.get(id)?.name_original).find(Boolean);
+    ids.map((id) => unitById.get(id)?.name_original ?? id).join("; ") || undefined;
 
   const evidenceRefs = (findingId: string) => {
     const ev = b.evidence[findingId] ?? [];
     return {
       all: ev,
-      before: ev.filter((e) => e.evidence_role === "before").map(refForEvidence),
-      after: ev.filter((e) => e.evidence_role === "after").map(refForEvidence),
+      before: ev.filter((e) => e.evidence_role !== "context" && e.side === "before").map(refForEvidence),
+      after: ev.filter((e) => e.evidence_role !== "context" && e.side === "after").map(refForEvidence),
+      context: ev.filter((e) => e.evidence_role === "context").map(refForEvidence),
+      error: b.evidenceErrors?.[findingId],
     };
   };
 
   /** Function → table side. The citation prefers the finding's evidence (it carries the excerpt). */
   const functionSide = (fnId: string, ev: ApiEvidence[]): FunctionSide | undefined => {
     const fn = fnById.get(fnId);
-    if (!fn) return undefined;
-    const hit = ev.find((e) => fn.source_ids.includes(e.source_id));
-    const ref = hit ? refForEvidence(hit) : fn.source_ids[0] ? refForSource(fn.source_ids[0]) : undefined;
-    if (!ref) return undefined;
+    if (!fn) throw new Error(`Не найдена функция ${fnId}. Обновите результат.`);
+    const refs = uniqueRefs(fn.source_ids.flatMap((sourceId) => {
+      const hits = ev.filter((e) => e.source_id === sourceId);
+      return hits.length ? hits.map(refForEvidence) : [refForSource(sourceId)];
+    }));
     return {
       unit: unitName(fn.owner_unit_ids) ?? (fn.actor_original || "Исполнитель не указан"),
-      ref,
+      owners: fn.owner_unit_ids.length ? fn.owner_unit_ids.map((id) => unitById.get(id)?.name_original ?? id) : fn.actor_original ? [fn.actor_original] : [],
+      refs,
+      function_id: fn.id,
       summary: capitalize([fn.action, fn.object, fn.scope].filter(Boolean).join(" ")),
     };
   };
@@ -310,10 +319,10 @@ export function toAnalysisResult(b: LiveBundle): AnalysisResult {
           ? `${beforeName} → ${afterName}`
           : shown?.name_original ?? (afterName || beforeName || "Подразделение");
       const parent = shown?.parent_unit_id ? unitById.get(shown.parent_unit_id)?.name_original : undefined;
-      const sideRef = (list: ApiUnit[], side: "before" | "after") => {
-        const id = list.flatMap((u) => u.source_ids)[0] ?? s.source_ids.find((sid) => refForSource(sid).side === side);
-        return id ? refForSource(id, list[0]?.name_original) : undefined;
-      };
+      const sideRef = (list: ApiUnit[], side: "before" | "after") => uniqueRefs(
+        [...new Set([...list.flatMap((u) => u.source_ids), ...s.source_ids])]
+          .map((id) => refForSource(id)).filter((ref) => ref.side === side),
+      );
       return {
         unit_id: s.id,
         name,
@@ -332,27 +341,32 @@ export function toAnalysisResult(b: LiveBundle): AnalysisResult {
     const status = FUNCTION_OF[f.change_type];
     if (!status) continue;
     const ev = evidenceRefs(f.id);
-    const before = f.before_function_ids.map((id) => functionSide(id, ev.all)).find(Boolean);
+    const before = f.before_function_ids.map((id) => functionSide(id, ev.all)).filter((s): s is FunctionSide => !!s);
     const after = f.after_function_ids
       .map((id) => functionSide(id, ev.all))
       .filter((s): s is FunctionSide => !!s);
-    const search = f.change_type === "potentially_missing" ? describeSearch(f.search) : undefined;
+    const search = f.change_type === "potentially_missing" ? {
+      complete: !!f.search && f.search.complete && !f.search.input_partial && !f.search.errors.length && !run.coverage.input_partial,
+      reviewed: f.search?.reviewed_source_ids.length ?? 0,
+      candidates: f.search?.candidate_source_ids.length ?? 0,
+      errors: f.search?.errors ?? [],
+      text: describeSearch(f.search ? { ...f.search, input_partial: f.search.input_partial || run.coverage.input_partial } : null) ?? "Нет данных о полноте поиска по комплекту «После».",
+    } : undefined;
     functions.push({
       id: f.id,
       title: f.title,
       status,
-      before:
-        before ??
-        (ev.before[0] ? { unit: "Исполнитель не указан", ref: ev.before[0], summary: f.title } : undefined),
+      before: before.length ? before : ev.before.map((ref) => ({ unit: "Исполнитель не указан", owners: [], refs: [ref], summary: f.title })),
       after: after.length
         ? after
         : status === "missing"
           ? []
-          : ev.after.map((ref) => ({ unit: "Исполнитель не указан", ref, summary: f.title })),
-      note: [f.explanation, search && !search.includes("полный: да") ? search : undefined].filter(Boolean).join(" ") || undefined,
+          : ev.after.map((ref) => ({ unit: "Исполнитель не указан", owners: [], refs: [ref], summary: f.title })),
+      note: f.explanation || undefined,
       recommendation: f.recommendation || undefined,
       review: toReview(f.review),
       search,
+      evidence: { before: ev.before, after: ev.after, context: ev.context, error: ev.error },
     });
   }
 
@@ -368,18 +382,16 @@ export function toAnalysisResult(b: LiveBundle): AnalysisResult {
     const sides: RiskSide[] = order
       .map((id) => functionSide(id, ev.all))
       .filter((s): s is FunctionSide => !!s);
-    if (sides.length < 2) {
-      [...ev.before, ...ev.after]
-        .filter((ref) => !sides.some((s) => s.ref.clause_id === ref.clause_id))
-        .forEach((ref) => sides.push({ unit: "Исполнитель не указан", ref }));
+    for (const ref of [...ev.before, ...ev.after]) {
+      if (!sides.some((s) => s.refs.some((r) => r.clause_id === ref.clause_id)))
+        sides.push({ unit: "Исполнитель не указан", owners: [], refs: [ref], summary: f.title });
     }
-    if (sides.length === 0) continue;
     risks.push({
       id: f.id,
       kind: RISK_OF[f.issue_type],
       title: f.title,
-      a: sides[0],
-      b: sides[1] ?? sides[0],
+      sides,
+      evidence: { before: ev.before, after: ev.after, context: ev.context, error: ev.error },
       why: f.explanation,
       check: f.recommendation,
       review: toReview(f.review),
@@ -404,41 +416,42 @@ export function toAnalysisResult(b: LiveBundle): AnalysisResult {
         text:
           `Проанализировано функций «До»: ${run.coverage.before_functions}, «После»: ${run.coverage.after_functions}. ` +
           (countText ? `Результат по функциям: ${countText}. ` : "") +
-          `Вопросов для проверки: ${risks.length}.` +
+          `Неотклонённых рисков: ${risks.filter((r) => !isRejected(r.review)).length}.` +
           reviewSummary(b.findings),
         refs: [],
       },
     ],
   });
-  const refsOf = (f: FunctionMapping) => [...(f.before ? [f.before.ref] : []), ...(f.after ?? []).map((a) => a.ref)];
+  const refsOf = (f: FunctionMapping) => uniqueRefs([...refsOfSides([...f.before, ...f.after]), ...(f.evidence?.before ?? []), ...(f.evidence?.after ?? []), ...(f.evidence?.context ?? [])]);
   const group = (title: string, statuses: FunctionStatus[]) => {
     const items = functions
       .filter((f) => statuses.includes(f.status) && !isRejected(f.review))
-      .map((f) => ({ text: withReview([f.title, f.note].filter(Boolean).join(". "), f.review), refs: refsOf(f) }));
+      .map((f) => ({ finding_id: f.id, text: withReview([f.title, f.note].filter(Boolean).join(". "), f.review), refs: refsOf(f) }));
     if (items.length) sections.push({ title, items });
   };
   group("Функции без найденного соответствия", ["missing"]);
   group("Переданные, разделённые и объединённые функции", ["transferred", "split", "merged"]);
   group("Новые функции", ["new"]);
-  const riskRefs = (r: Risk) => (r.a.ref.clause_id === r.b.ref.clause_id ? [r.a.ref] : [r.a.ref, r.b.ref]);
+  const riskRefs = (r: Risk) => uniqueRefs([...refsOfSides(r.sides), ...(r.evidence?.before ?? []), ...(r.evidence?.after ?? []), ...(r.evidence?.context ?? [])]);
   const openRisks = risks.filter((r) => !isRejected(r.review));
   if (openRisks.length) {
     sections.push({
       title: "Вопросы для проверки",
       items: openRisks.map((r) => ({
+        finding_id: r.id,
         text: withReview(`${RISK_KIND[r.kind].label}: ${r.title}. ${r.check}`.trim(), r.review),
         refs: riskRefs(r),
       })),
     });
   }
   // One entry per finding even when it is both a function row and a risk card.
-  const byFinding = new Map<string, { title: string; review?: Review; refs: ClauseRef[] }>();
-  functions.forEach((f) => byFinding.set(f.id, { title: f.title, review: f.review, refs: refsOf(f) }));
-  risks.forEach((r) => byFinding.has(r.id) || byFinding.set(r.id, { title: r.title, review: r.review, refs: riskRefs(r) }));
+  const byFinding = new Map<string, { finding_id: string; title: string; review?: Review; refs: ClauseRef[] }>();
+  functions.forEach((f) => byFinding.set(f.id, { finding_id: f.id, title: f.title, review: f.review, refs: refsOf(f) }));
+  risks.forEach((r) => byFinding.has(r.id) || byFinding.set(r.id, { finding_id: r.id, title: r.title, review: r.review, refs: riskRefs(r) }));
   const reviewed = (status: "needs_clarification" | "rejected", title: string, noteLabel: string) => {
     const items = [...byFinding.values()]
       .filter((x) => x.review?.status === status)
-      .map((x) => ({ text: x.review?.note ? `${x.title}. ${noteLabel}: ${x.review.note}` : x.title, refs: x.refs }));
+      .map((x) => ({ text: x.review?.note ? `${x.title}. ${noteLabel}: ${x.review.note}` : x.title, finding_id: x.finding_id, refs: x.refs }));
     if (items.length) sections.push({ title, items });
   };
   reviewed("needs_clarification", "Вопросы без окончательной проверки", "Заметка проверяющего");
@@ -446,7 +459,7 @@ export function toAnalysisResult(b: LiveBundle): AnalysisResult {
   const structureItems = [
     ...units
       .filter((u) => u.status !== "kept")
-      .map((u) => ({ text: [u.name, u.note].filter(Boolean).join(": "), refs: [u.before, u.after].filter((r): r is ClauseRef => !!r) })),
+      .map((u) => ({ text: [u.name, u.note].filter(Boolean).join(": "), refs: [...u.before, ...u.after] })),
     ...b.findings
       .filter((f) => f.change_type === "structure_changed")
       .map((f) => ({ text: [f.title, f.explanation].filter(Boolean).join(": "), refs: f.source_ids.map((id) => refForSource(id)) })),
@@ -497,6 +510,13 @@ export function toAnalysisResult(b: LiveBundle): AnalysisResult {
   const partial = run.state === "partial";
   return {
     id: analysis.id,
+    output_language: run.output_language,
+    coverage: { complete: c.total_sources > 0 && run.state === "completed" && !c.input_partial && !run.errors.length && c.processed_sources === c.total_sources && c.compared_before_functions === c.before_functions && c.reviewed_after_functions === c.after_functions && c.reviewed_structure_units === c.structure_units && !c.unprocessed_source_ids.length && !c.unreviewed_function_ids.length, processed: c.processed_sources, total: c.total_sources },
+    structureFindings: b.findings.filter((f) => f.change_type === "structure_changed").map((f) => {
+      const ev = evidenceRefs(f.id);
+      const refs = f.source_ids.map((id) => refForSource(id));
+      return { title: f.title, kind: "unit", status: "changed", finding_id: f.id, review: toReview(f.review), note: f.explanation, recommendation: f.recommendation, before: uniqueRefs([...ev.before, ...refs.filter((r) => r.side === "before")]), after: uniqueRefs([...ev.after, ...refs.filter((r) => r.side === "after")]), context: ev.context, error: ev.error };
+    }),
     mode: partial ? "partial" : "live",
     editions: { before: { label: sideLabel(before) }, after: { label: sideLabel(after) } },
     units,

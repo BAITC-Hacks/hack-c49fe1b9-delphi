@@ -1,9 +1,10 @@
+import { reviewQueue } from "@/lib/evidence";
 import { Info } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { RefButton } from "@/components/RefButton";
-import type { AnalysisResult, ClauseRef, EvidenceRequest } from "@/types";
+import type { AnalysisResult, ClauseRef, ConclusionItem, EvidenceRequest } from "@/types";
 
 interface Props {
   result: AnalysisResult;
@@ -11,21 +12,11 @@ interface Props {
 }
 
 export function ConclusionReport({ result, onEvidence }: Props) {
-  const sideOf = (ref: ClauseRef) =>
-    ref.side ??
-    (ref.document_id === result.units.find((u) => u.before)?.before?.document_id
-      ? "before"
-      : ref.document_id === result.units.find((u) => u.after)?.after?.document_id
-        ? "after"
-        : undefined);
-  const openRef = (text: string, ref: ClauseRef) =>
-    onEvidence({
-      title: text,
-      kind: "function",
-      status: "kept",
-      before: sideOf(ref) === "before" ? [ref] : [],
-      after: sideOf(ref) === "after" ? [ref] : [],
-    });
+  const queue = reviewQueue(result);
+  const openRef = (item: ConclusionItem, ref: ClauseRef) => {
+    const finding = item.finding_id ? queue.find((f) => f.finding_id === item.finding_id) : undefined;
+    onEvidence(finding ?? { title: item.text, kind: "source", context: [ref] });
+  };
 
   return (
     <Card>
@@ -52,7 +43,7 @@ export function ConclusionReport({ result, onEvidence }: Props) {
                   {item.refs.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                       {item.refs.map((ref, k) => (
-                        <RefButton key={k} ref_={ref} size="xs" onClick={() => openRef(item.text, ref)} />
+                        <RefButton key={k} ref_={ref} size="xs" onClick={() => openRef(item, ref)} />
                       ))}
                     </div>
                   )}

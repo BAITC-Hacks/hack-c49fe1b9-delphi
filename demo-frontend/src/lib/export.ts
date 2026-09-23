@@ -1,112 +1,44 @@
-import type { AnalysisResult } from "@/types";
+import type { AnalysisResult, ClauseRef, FunctionSide, Review } from "@/types";
 import { citeRef } from "@/lib/format";
-import { FUNCTION_STATUS, REVIEW_STATUS, RISK_KIND, UNIT_STATUS } from "@/lib/status";
-import type { Review } from "@/types";
+import { FUNCTION_STATUS, REVIEW_STATUS, UNIT_STATUS } from "@/lib/status";
+import { reviewQueue, riskSummary, uniqueRefs } from "@/lib/evidence";
 
-const reviewLabel = (r?: Review) => (r && r.status !== "unreviewed" ? REVIEW_STATUS[r.status].label : "");
-
-function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const reviewLabel = (r?: Review) => REVIEW_STATUS[r?.status ?? "unreviewed"].label;
+const refsText = (refs: ClauseRef[]) => refs.map(citeRef).join("; ");
+const sidesText = (sides: FunctionSide[]) => sides.map((s) => `${s.unit} — ${refsText(s.refs)}`).join(" | ");
 
 export function download(filename: string, content: string, type: string) {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const a = document.createElement("a"); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Self-contained HTML report: opens anywhere, prints to PDF, keeps every citation. */
+/** All decisions use the same finding IDs and saved review as the on-screen queue. */
 export function buildHtml(r: AnalysisResult): string {
-  const units = r.units
-    .map(
-      (u) =>
-        `<tr><td>${esc(u.name)}</td><td>${esc(UNIT_STATUS[u.status].label)}</td><td>${
-          u.before ? esc(citeRef(u.before)) : "—"
-        }</td><td>${u.after ? esc(citeRef(u.after)) : "—"}</td></tr>`,
-    )
-    .join("");
-
-  const functions = r.functions
-    .map((f) => {
-      const after = (f.after ?? []).map((a) => `${esc(a.unit)} — ${esc(citeRef(a.ref))}`).join("<br/>") || "—";
-      const review = reviewLabel(f.review);
-      return `<tr><td>${esc(f.title)}</td><td>${f.before ? `${esc(f.before.unit)} — ${esc(citeRef(f.before.ref))}` : "—"}</td><td>${after}</td><td>${esc(
-        FUNCTION_STATUS[f.status].label,
-      )}${review ? `<br/><small>${esc(review)}</small>` : ""}</td><td>${f.confidence != null ? `${Math.round(f.confidence * 100)} %` : "—"}</td><td>${esc(f.note ?? "")}</td></tr>`;
-    })
-    .join("");
-
-  const risks = r.risks
-    .map(
-      (k) =>
-        `<li><strong>${esc(RISK_KIND[k.kind].label)}: ${esc(k.title)}</strong><br/>${esc(k.a.unit)} — ${esc(
-          citeRef(k.a.ref),
-        )} · ${esc(k.b.unit)} — ${esc(citeRef(k.b.ref))}<br/><em>Почему:</em> ${esc(k.why)}<br/><em>Что проверить:</em> ${esc(k.check)}</li>`,
-    )
-    .join("");
-
-  const sections = r.conclusion.sections
-    .map(
-      (s) =>
-        `<h3>${esc(s.title)}</h3><ul>${s.items
-          .map((i) => `<li>${esc(i.text)} <small>(${i.refs.map(citeRef).map(esc).join("; ")})</small></li>`)
-          .join("")}</ul>`,
-    )
-    .join("");
-
-  const limitations = r.conclusion.limitations.map((l) => `<li>${esc(l)}</li>`).join("");
-
-  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Delphi — заключение</title>
-<style>body{font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#0f172a;max-width:960px;margin:32px auto;padding:0 16px}
-h1{font-size:22px}h2{font-size:18px;margin-top:28px}h3{font-size:15px;margin-top:18px}table{border-collapse:collapse;width:100%;font-size:13px}
-td,th{border:1px solid #cbd5e1;padding:6px 8px;vertical-align:top;text-align:left}th{background:#f1f5f9}small{color:#475569}li{margin:6px 0}</style></head><body>
-<h1>Delphi — контроль функций при реорганизации</h1>
-<p>Комплект «До»: ${esc(r.editions.before.label)}${r.editions.before.date ? ` (${esc(r.editions.before.date)})` : ""}.
-Комплект «После»: ${esc(r.editions.after.label)}${r.editions.after.date ? ` (${esc(r.editions.after.date)})` : ""}.
-Режим: ${esc(r.mode)}. Выводы носят рекомендательный характер и требуют проверки ответственным сотрудником.</p>
-<h2>Структура</h2><table><tr><th>Подразделение</th><th>Статус</th><th>Источник «До»</th><th>Источник «После»</th></tr>${units}</table>
-<h2>Функции</h2><table><tr><th>Функция</th><th>«До»</th><th>«После»</th><th>Статус</th><th>Уверенность</th><th>Комментарий</th></tr>${functions}</table>
-<h2>Вопросы для проверки</h2><ul>${risks || "<li>Не выявлено.</li>"}</ul>
-<h2>Заключение</h2>${sections}
-<h3>Ограничения анализа</h3><ul>${limitations}</ul>
-</body></html>`;
+  const units = r.units.map((u) => `<tr><td>${esc(u.name)}</td><td>${esc(UNIT_STATUS[u.status].label)}</td><td>${esc(refsText(u.before))}</td><td>${esc(refsText(u.after))}</td></tr>`).join("");
+  const functions = r.functions.map((f) => `<tr><td>${esc(f.title)}</td><td>${esc(sidesText(f.before))}</td><td>${esc(sidesText(f.after))}</td><td>${esc(FUNCTION_STATUS[f.status].label)}</td><td>${esc(reviewLabel(f.review))}<br/>${esc(f.review?.note ?? "")}</td></tr>`).join("");
+  const queue = reviewQueue(r);
+  const decisions = (["unreviewed", "needs_clarification", "confirmed", "rejected"] as const).map((status) => {
+    const entries = queue.filter((f) => (f.review?.status ?? "unreviewed") === status);
+    if (!entries.length) return "";
+    return `<h3>${esc(REVIEW_STATUS[status].label)}</h3><ul>${entries.map((f) => `<li><strong>${esc(f.title)}</strong><p>${esc(f.note ?? "")}</p><p>${esc(f.recommendation ?? "")}</p>${f.review?.note ? `<p>Заметка проверяющего: ${esc(f.review.note)}</p>` : ""}<small>${esc(refsText(uniqueRefs([...(f.before ?? []), ...(f.after ?? []), ...(f.context ?? [])])))}</small>${f.error ? `<p>Доказательства загружены не полностью: ${esc(f.error)}</p>` : ""}</li>`).join("")}</ul>`;
+  }).join("");
+  const sections = r.conclusion.sections.map((s) => `<h3>${esc(s.title)}</h3><ul>${s.items.map((i) => `<li>${esc(i.text)} <small>${esc(refsText(i.refs))}</small></li>`).join("")}</ul>`).join("");
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Delphi — заключение</title><style>
+  body{font:14px/1.6 system-ui,sans-serif;color:#1a2335;max-width:1100px;margin:32px auto;padding:0 20px}h1{font-size:24px}h2{font-size:20px;margin-top:32px}h3{font-size:16px}table{border-collapse:collapse;width:100%;table-layout:fixed}td,th{border:1px solid #dde2eb;padding:10px;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{background:#eef1f6}small{color:#5d6a80}li{margin:12px 0}p{white-space:pre-line}@media print{body{margin:0}tr,li{break-inside:avoid}}
+  </style></head><body><h1>Delphi — заключение по сравнению документов</h1>
+  <p>До: ${esc(r.editions.before.label)}. После: ${esc(r.editions.after.label)}.</p><p>${esc(riskSummary(r))}</p>
+  <h2>Решения по выводам</h2>${decisions || "<p>Выводы для проверки отсутствуют.</p>"}
+  <h2>Структура</h2><table><tr><th>Подразделение</th><th>Статус</th><th>До</th><th>После</th></tr>${units}</table>
+  <h2>Функции</h2><table><tr><th>Функция</th><th>До</th><th>После</th><th>Изменение</th><th>Проверка человеком</th></tr>${functions}</table>
+  <h2>Заключение</h2>${sections}<h2>Ограничения анализа</h2><ul>${r.conclusion.limitations.map((l) => `<li>${esc(l)}</li>`).join("")}</ul></body></html>`;
 }
 
 export function buildCsv(r: AnalysisResult): string {
-  const q = (s: string) => `"${s.replace(/"/g, '""')}"`;
-  const header = [
-    "status",
-    "title",
-    "before_unit",
-    "before_clause",
-    "after_unit",
-    "after_clause",
-    "confidence",
-    "note",
-    "review",
-    "review_note",
-  ];
-  const rows = r.functions.map((f) =>
-    [
-      f.status,
-      f.title,
-      f.before?.unit ?? "",
-      f.before ? citeRef(f.before.ref) : "",
-      (f.after ?? []).map((a) => a.unit).join(" | "),
-      (f.after ?? []).map((a) => citeRef(a.ref)).join(" | "),
-      f.confidence != null ? String(Math.round(f.confidence * 100)) : "",
-      f.note ?? "",
-      reviewLabel(f.review),
-      f.review?.note ?? "",
-    ]
-      .map(q)
-      .join(","),
-  );
-  return "﻿" + [header.join(","), ...rows].join("\r\n");
+  // Spreadsheet applications must not interpret source or reviewer text as formulas.
+  const q = (s: string) => `"${(/^[\s]*[=+@-]/.test(s) ? "'" + s : s).replace(/"/g, '""')}"`;
+  const header = ["status", "title", "before_units", "before_sources", "after_units", "after_sources", "note", "review", "review_note"];
+  const rows = r.functions.map((f) => [f.status, f.title, f.before.map((s) => s.unit).join(" | "), refsText(f.before.flatMap((s) => s.refs)), f.after.map((s) => s.unit).join(" | "), refsText(f.after.flatMap((s) => s.refs)), f.note ?? "", reviewLabel(f.review), f.review?.note ?? ""].map(q).join(","));
+  return "\uFEFF" + [header.join(","), ...rows].join("\r\n");
 }

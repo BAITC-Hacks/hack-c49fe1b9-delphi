@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { reviewQueue, riskSummary } from "@/lib/evidence";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AlertTriangle, ShieldCheck } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -24,8 +25,13 @@ export default function AnalysisPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data, error, loading, reload, replace } = useAnalysis(id);
+  const [params, setParams] = useSearchParams();
+  const findingId = params.get("finding");
   const [evidence, setEvidence] = useState<EvidenceRequest | null>(null);
 
+  useEffect(() => {
+    if (data && findingId) setEvidence(reviewQueue(data).find((f) => f.finding_id === findingId) ?? null);
+  }, [data, findingId]);
   /** Scenario H: stored on the server; the page is rebuilt from the saved bundle, not refetched. */
   const onReview = async (findingId: string, status: ReviewStatus, note: string) => {
     if (!id) return;
@@ -115,7 +121,7 @@ export default function AnalysisPage() {
           </div>
         </div>
 
-        <Tabs defaultValue="structure" className="gap-4">
+        <Tabs defaultValue={findingId ? "functions" : "structure"} className="gap-4">
           <TabsList className="no-print w-full justify-start overflow-x-auto sm:w-auto">
             <TabsTrigger value="structure">Структура</TabsTrigger>
             <TabsTrigger value="functions">Функции и риски</TabsTrigger>
@@ -146,14 +152,14 @@ export default function AnalysisPage() {
               {data.risks.length === 0 ? (
                 <p className="flex items-center gap-2 rounded-lg border bg-card px-4 py-3 text-sm text-muted-foreground">
                   <ShieldCheck className="size-4" aria-hidden="true" />
-                  Дублирований и конфликтов не выявлено — это результат проверки, а не отсутствие проверки.
+                  {riskSummary(data)}
                 </p>
               ) : (
                 <div className="flex flex-col gap-3">
                   {data.risks.map((r) => (
                     <RiskCard key={r.id} risk={r} onEvidence={setEvidence} />
                   ))}
-                  {!data.risks.some((r) => r.kind === "conflict") && (
+                  {data.coverage?.complete && !data.risks.some((r) => r.kind === "conflict") && (
                     <p className="text-xs text-muted-foreground">
                       Признаков конфликта интересов в предоставленном комплекте не выявлено.
                     </p>
@@ -172,9 +178,10 @@ export default function AnalysisPage() {
       </div>
 
       <EvidenceDrawer
-        request={evidence}
+        request={evidence?.finding_id ? reviewQueue(data).find((f) => f.finding_id === evidence.finding_id) ?? evidence : evidence}
         analysisId={id ?? DEMO_ID}
-        onClose={() => setEvidence(null)}
+        onClose={() => { setEvidence(null); const next = new URLSearchParams(params); next.delete("finding"); setParams(next, { replace: true }); }}
+        onRetry={reload}
         onReview={data.live ? onReview : undefined}
       />
     </AppShell>

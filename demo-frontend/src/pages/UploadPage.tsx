@@ -130,8 +130,12 @@ export default function UploadPage() {
       const known = { ...uploads };
       for (const [key, u] of Object.entries(known)) {
         if (keep.has(key)) continue;
-        if (u.doc) await deleteDocument(aid, u.doc.id).catch(() => undefined);
+        if (u.doc) {
+          try { await deleteDocument(aid, u.doc.id); }
+          catch { throw new Error(`Не удалось убрать «${u.doc.filename}» из комплекта. Анализ не запущен. Повторите отправку.`); }
+        }
         delete known[key];
+        setUploads({ ...known });
       }
       setUploads(known);
 

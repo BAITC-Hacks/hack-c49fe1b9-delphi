@@ -155,8 +155,14 @@ export function uploadDocument(analysisId: string, side: ApiSide, file: File) {
   return request<ApiDocument>(`/api/analyses/${id(analysisId)}/documents`, { method: "POST", body: fd });
 }
 
-export function deleteDocument(analysisId: string, documentId: string) {
-  return request<void>(`/api/analyses/${id(analysisId)}/documents/${id(documentId)}`, { method: "DELETE" });
+export async function deleteDocument(analysisId: string, documentId: string) {
+  try {
+    await request<void>(`/api/analyses/${id(analysisId)}/documents/${id(documentId)}`, { method: "DELETE" });
+  } catch (error) {
+    // A previous request may have committed before its response was lost.
+    if (error instanceof ApiError && error.code === "document_not_found") return;
+    throw error;
+  }
 }
 
 export function startRun(analysisId: string, allowPartial: boolean) {
@@ -216,9 +222,14 @@ export async function loadLiveBundle(analysisId: string): Promise<LiveBundle> {
   if (run.state === "queued" || run.state === "running") {
     throw new ApiError(409, "Анализ ещё выполняется. Откройте экран прогресса.", "run_in_progress");
   }
-  const evidenceLists = await mapLimited(findings, 6, (f) =>
-    request<ApiEvidence[]>(`/api/findings/${id(f.id)}/evidence`).catch(() => [] as ApiEvidence[]),
-  );
+  const evidenceErrors: Record<string, string> = {};
+  const evidenceLists = await mapLimited(findings, 6, async (f) => {
+    try { return await request<ApiEvidence[]>(`/api/findings/${id(f.id)}/evidence`); }
+    catch (e) {
+      evidenceErrors[f.id] = e instanceof Error ? e.message : "Не удалось загрузить доказательства";
+      return [];
+    }
+  });
   const sources: Record<string, ApiSource> = {};
   sourceLists.flat().forEach((s) => (sources[s.id] = s));
   const evidence: Record<string, ApiEvidence[]> = {};
@@ -228,7 +239,7 @@ export async function loadLiveBundle(analysisId: string): Promise<LiveBundle> {
   Object.values(sources).forEach((s) =>
     liveClauses.set(s.id, toClause(s, labels[s.document_id] ?? "", s.parent_id ? sources[s.parent_id] : undefined)),
   );
-  return { analysis, run, findings, functions, sources, evidence };
+  return { analysis, run, findings, functions, sources, evidence, evidenceErrors };
 }
 
 export async function getAnalysis(analysisId: string): Promise<AnalysisResult> {
@@ -277,7 +288,7 @@ export function updateReview(findingId: string, status: ReviewStatus, note: stri
 export async function saveReview(analysisId: string, findingId: string, status: ReviewStatus, note: string) {
   const saved = await updateReview(findingId, status, note);
   const bundle = liveBundles.get(analysisId);
-  if (!bundle) return undefined;
+  if (!bundle) return getAnalysis(analysisId);
   const findings = bundle.findings.map((f) =>
     f.id === findingId ? { ...f, review: { finding_id: f.id, status: saved.status, note: saved.note, updated_at: saved.updated_at } } : f,
   );

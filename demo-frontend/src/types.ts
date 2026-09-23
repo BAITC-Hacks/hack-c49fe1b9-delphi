@@ -41,6 +41,9 @@ export interface ClauseRef {
   clause_number: string;
   /** Optional substring of the clause text to highlight in the evidence panel. */
   highlight?: string;
+  /** Python Unicode code-point offsets; end is exclusive. Do not use directly with JS slice. */
+  start_offset?: number | null;
+  end_offset?: number | null;
   /** Set cards: which side the document belongs to. Live results can have several documents per side. */
   side?: "before" | "after";
 }
@@ -61,15 +64,25 @@ export interface Unit {
   name: string;
   status: UnitStatus;
   parent?: string;
-  before?: ClauseRef;
-  after?: ClauseRef;
+  before: ClauseRef[];
+  after: ClauseRef[];
   note?: string;
 }
 
 export interface FunctionSide {
   unit: string;
-  ref: ClauseRef;
+  owners: string[];
+  refs: ClauseRef[];
+  function_id?: string;
   summary: string;
+}
+
+export interface SearchCoverage {
+  complete: boolean;
+  reviewed: number;
+  candidates: number;
+  errors: string[];
+  text: string;
 }
 
 export interface FunctionMapping {
@@ -78,20 +91,23 @@ export interface FunctionMapping {
   status: FunctionStatus;
   /** 0–1. The live backend does not score matches, so it is absent there. */
   confidence?: number;
-  before?: FunctionSide;
-  after?: FunctionSide[];
+  before: FunctionSide[];
+  after: FunctionSide[];
+  evidence?: EvidenceSet;
   /** What changed, in words. */
   note?: string;
   /** Short recommendation for the analyst (architecture.md Finding.recommendation). */
   recommendation?: string;
   review?: Review;
-  /** Missing-duty search over the After set (live only): "Поиск по N пунктам …, полный: да/нет". */
-  search?: string;
+  /** Structured search coverage; never parse its display text to infer completeness. */
+  search?: SearchCoverage;
 }
 
 export interface RiskSide {
   unit: string;
-  ref: ClauseRef;
+  owners: string[];
+  refs: ClauseRef[];
+  function_id?: string;
   summary?: string;
 }
 
@@ -99,14 +115,15 @@ export interface Risk {
   id: string;
   kind: RiskKind;
   title: string;
-  a: RiskSide;
-  b: RiskSide;
+  sides: RiskSide[];
+  evidence?: EvidenceSet;
   why: string;
   check: string;
   review?: Review;
 }
 
 export interface ConclusionItem {
+  finding_id?: string;
   text: string;
   refs: ClauseRef[];
 }
@@ -142,6 +159,9 @@ export interface AnalysisResult {
   risks: Risk[];
   conclusion: Conclusion;
   trace: TraceItem[];
+  coverage?: { complete: boolean; processed: number; total: number };
+  structureFindings?: EvidenceRequest[];
+  output_language?: "ru" | "kk" | "en";
   partial?: { failed_stage: number; message: string };
   /** Present for results loaded from the backend: server exports and review need the run. */
   live?: { analysis_id: string; run_id: string; review_revision: number };
@@ -164,10 +184,17 @@ export interface JobStatus {
 }
 
 /** What the evidence drawer needs to render. */
+export interface EvidenceSet {
+  before: ClauseRef[];
+  after: ClauseRef[];
+  context: ClauseRef[];
+  error?: string;
+}
+
 export interface EvidenceRequest {
   title: string;
-  kind: "function" | "unit" | "risk";
-  status: FunctionStatus | UnitStatus | RiskKind;
+  kind: "function" | "unit" | "risk" | "source";
+  status?: FunctionStatus | UnitStatus | RiskKind;
   before?: ClauseRef[];
   after?: ClauseRef[];
   /** Extra context under the title, e.g. how completely the After set was searched. */
@@ -175,6 +202,11 @@ export interface EvidenceRequest {
   /** Live results: the finding behind this row/card, so the drawer can record a human review. */
   finding_id?: string;
   review?: Review;
+  context?: ClauseRef[];
+  error?: string;
+  recommendation?: string;
+  searchComplete?: boolean;
+  participants?: RiskSide[];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -391,4 +423,5 @@ export interface LiveBundle {
   sources: Record<string, ApiSource>;
   /** finding_id → saved evidence (excerpts are sliced from the original text by the backend). */
   evidence: Record<string, ApiEvidence[]>;
+  evidenceErrors?: Record<string, string>;
 }
