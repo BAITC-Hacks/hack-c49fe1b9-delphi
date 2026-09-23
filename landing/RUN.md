@@ -2,6 +2,16 @@
 
 Самостоятельный сайт в `landing/`. Не меняет маршруты и код приложений `demo-frontend/` и `frontend/`.
 
+## Публичные версии
+
+- Лендинг: https://delphi-landing-green.vercel.app
+- Демо: https://delphi-review-demo.vercel.app
+
+Оба сайта опубликованы из кода общего репозитория `BAITC-Hacks/hack-c49fe1b9-delphi`.
+Автоматическая GitHub-интеграция Vercel пока недоступна: текущая публикация выполнена вручную через CLI.
+Изменения в GitHub сами по себе не обновят опубликованные сайты.
+Для публичной сборки лендинга задайте `VITE_DEMO_URL=https://delphi-review-demo.vercel.app`.
+
 ## Локальный запуск
 
 ```sh
