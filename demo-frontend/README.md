@@ -10,8 +10,7 @@ React 18 + TypeScript + Vite + Tailwind CSS 4 + shadcn/ui. UI на русско�
 
 | Шаг | Что показать |
 |---|---|
-| `/` Знакомство с Delphi | Задачи продукта, понятный пример передачи функции и переход к демонстрации |
-| `/history` История | Кейсы: реальные обезличенные редакции 8 → 9 и синтетические контрольные примеры (помечены «Синтетика») |
+| `/` История | Кейсы: реальные обезличенные редакции 8 → 9 и синтетические контрольные примеры (помечены «Синтетика») |
 | `/new` → «Показать анализ» | Пять стадий анализа воспроизводятся за несколько секунд с пометкой «Модель не вызывается» |
 | `/analyses/:id` | Сводные плитки (не найдено · передано · вопросы · ждут решения) — клик открывает очередь с фильтром |
 | `/analyses/:id/review` | Очередь проверки: вопросы слева, изменение и дословные цитаты справа, решение внизу (1/2/3, J/K). Решения хранятся в браузере и попадают в заключение и экспорт; «Сбросить решения примера» — для повторного показа |
@@ -36,12 +35,11 @@ npm run build      # tsc --noEmit && vite build → dist/
 
 В проде бэкенд отдаёт `demo-frontend/dist` как статику с того же origin; SPA-маршруты должны падать на `index.html`.
 
-## Маршруты
+## Маршруты (по `docs/product.md` §3)
 
 | Адрес | Страница |
 |---|---|
-| `/` | Знакомство с Delphi: задачи продукта, пример и вход в демонстрацию |
-| `/history` | История: сохранённые примеры в демо-режиме; анализы из `GET /api/analyses` в live-режиме |
+| `/` | История анализов (`GET /api/analyses`; при недоступном бэкенде — пустое состояние) |
 | `/new` | Новое сравнение: две зоны «До/После», «Анализировать», «Загрузить пример» |
 | `/runs/:runId` | Прогресс анализа: степпер 5 стадий, опрос раз в 2 с |
 | `/analyses/:id` | Результаты: вкладки «Структура», «Функции и риски», «Заключение»; панель источников; трасса агента |
@@ -57,7 +55,7 @@ npm run build      # tsc --noEmit && vite build → dist/
 
 | Экран | Вызовы |
 |---|---|
-| `/history` История | `GET /api/analyses`, `GET /api/health` (бейдж «ИИ не настроен» / «Сервер недоступен») |
+| `/` История | `GET /api/analyses`, `GET /api/health` (бейдж «ИИ не настроен» / «Сервер недоступен») |
 | `/new` Загрузка | `POST /api/analyses {title}` → `POST /api/analyses/{id}/documents` (form-data `side`, `file`) по одному файлу → при `parse_status = partial` чекбокс «Запустить ограниченный анализ» → `POST /api/analyses/{id}/runs {output_language: "ru", allow_partial}`. Удалённые из зоны файлы — `DELETE …/documents/{doc}` (пока черновик) |
 | `/runs/:runId` Прогресс | `GET /api/runs/{id}` раз в 2 с до `completed / partial / failed / interrupted`. «Повторить анализ» = `POST /api/analyses/{id}/repeat` + новый запуск. Отмены в API нет — кнопка «К истории» |
 | `/analyses/:id` Результат | `GET /api/analyses/{id}` → `GET /api/runs/{run}` + `…/findings` + `…/functions` + `GET /api/analyses/{id}/documents/{doc}/sources` на каждый документ + `GET /api/findings/{f}/evidence` на каждую находку (≤ 6 параллельно) |
@@ -84,7 +82,7 @@ src/
                       RiskCard, EvidenceDrawer, ClauseFragment, ConclusionReport, ExportMenu,
                       TracePanel, EmptyState, RefButton, EditionBadge, ModeBadge, ReviewControls
   components/ui/      shadcn/ui (button.tsx обёрнут в forwardRef — не перегенерировать)
-  pages/              LandingPage (/), HistoryPage (/history), UploadPage (/new), ProgressPage (/runs/:id), AnalysisPage (/analyses/:id)
+  pages/              HistoryPage (/), UploadPage (/new), ProgressPage (/runs/:id), AnalysisPage (/analyses/:id)
 public/demo/          result.json, clauses.json — офлайн-пример
 ```
 

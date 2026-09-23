@@ -1,15 +1,16 @@
 import { useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
-import { ArrowDown, ArrowRight, ArrowRightLeft, Check, ChevronDown, Copy, FileCheck2, FileText, SearchX, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Link } from "@/components/Link";
+import { ArrowDown, ArrowRight, ArrowRightLeft, Check, ChevronDown, Copy, FileCheck2, FileText, GitFork, GitMerge, Plus, SearchX, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TransferExplainer } from "@/components/landing/TransferExplainer";
-import { DEMO_ONLY } from "@/lib/demo";
+import { DEMO_ONLY } from "@/config";
+import { ProductHero, ProductShowcase } from "@/components/ProductShowcase";
 import "@/styles/landing.css";
 
 const questions = [
   { icon: ArrowRightLeft, tone: "transfer", label: "Передача функции", title: "Кто теперь отвечает?", description: "Обязанность могла перейти в другое подразделение или другой документ. Найдите нового исполнителя.", link: "/analyses/demo-transfer/review?f=risk-register-transferred-across-documents&review=all" },
   { icon: SearchX, tone: "missing", label: "Соответствие не найдено", title: "Что требует уточнения?", description: "Посмотрите, для каких обязанностей не найдено соответствие в комплекте «После». Это повод проверить, а не вывод об отмене.", link: "/analyses/demo-missing/review?f=risk-register-missing&review=all" },
-  { icon: Copy, tone: "overlap", label: "Возможное дублирование", title: "Где ответственность пересекается?", description: "Уточните роли, когда одна и та же задача закреплена сразу за несколькими подразделениями.", link: "/analyses/demo-overlap/review?f=exclusive-duty-duplicated&review=all" },
+  { icon: Copy, tone: "overlap", label: "Возможное дублирование", title: "Где ответственность пересекается?", description: "Одна задача закреплена за несколькими подразделениями? Сверьте два пункта «После» рядом и уточните роли.", link: "/analyses/demo-overlap/review?f=exclusive-duty-duplicated&review=all" },
   { icon: TriangleAlert, tone: "conflict", label: "Возможный конфликт", title: "Какие требования несовместимы?", description: "Проверьте противоречия в порядке действий и возможные конфликты интересов по исходным пунктам.", link: "/analyses/demo-conflict/review?f=incompatible-approval-sequence&review=all" },
 ];
 
@@ -63,12 +64,12 @@ export default function LandingPage() {
             <h1 id="hero-title">Кто теперь<br />за что <span>отвечает?</span></h1>
             <p className="landing-lead">Delphi сравнивает положения «До» и «После». Показывает, кому передали обязанности, где не найдено соответствие и что стоит проверить.</p>
             <div className="landing-hero-actions">
-              <Button asChild size="lg" className="landing-primary"><Link to={DEMO_ONLY ? "/analyses/demo-transfer/review?f=risk-register-transferred-across-documents&review=all" : "/new"}>{DEMO_ONLY ? "Посмотреть на примере" : "Начать сравнение"}<ArrowRight aria-hidden="true" /></Link></Button>
+              <Button asChild size="lg" className="landing-primary"><Link to={DEMO_ONLY ? "/analyses/demo/review?f=f-svk&review=all" : "/new"}>{DEMO_ONLY ? "Посмотреть на примере" : "Начать сравнение"}<ArrowRight aria-hidden="true" /></Link></Button>
               <a href="#how-it-works" className="landing-text-link">Как это работает <ArrowDown size={16} aria-hidden="true" /></a>
             </div>
             <p className="landing-demo-note"><span aria-hidden="true" />{DEMO_ONLY ? "Демо на готовых результатах. Ваши файлы не нужны." : "Каждый вывод можно проверить по исходному документу."}</p>
           </div>
-          <div className="landing-hero-visual"><TransferExplainer /></div>
+          <div className="landing-hero-visual"><ProductHero /></div>
         </section>
 
         <div className="landing-container landing-assurances" aria-label="Принципы работы">
@@ -77,9 +78,11 @@ export default function LandingPage() {
           <div><FileCheck2 aria-hidden="true" /><span>Заключение с вашими отметками</span></div>
         </div>
 
+        <ProductShowcase />
+
         <section id="questions" className="landing-container landing-section" aria-labelledby="questions-title">
           <div className="landing-section-heading" data-reveal>
-            <p className="landing-eyebrow">Четыре вопроса вместо сотен страниц</p>
+            <p className="landing-eyebrow">Главные вопросы об изменениях</p>
             <h2 id="questions-title">Сразу к тому,<br />что требует внимания.</h2>
             <p>Изменение номера пункта ещё не означает изменение обязанности. Проверьте смысл, исполнителя и условия.</p>
           </div>
@@ -93,6 +96,11 @@ export default function LandingPage() {
               </article>
             ))}
           </div>
+          <div className="landing-status-map" aria-label="Статусы функций"><span>В карте функций:</span>{[
+            { icon: Check, label: "Сохранена" }, { icon: ArrowRightLeft, label: "Передана" },
+            { icon: GitFork, label: "Разделена" }, { icon: GitMerge, label: "Объединена" },
+            { icon: Plus, label: "Добавлена" }, { icon: SearchX, label: "Соответствие не найдено" },
+          ].map(({ icon: Icon, label }) => <span className="landing-function-status" key={label}><Icon size={13} aria-hidden="true" />{label}</span>)}</div>
           <p className="landing-section-note">Эти четыре примера — синтетические учебные материалы. Результаты подготовлены заранее.</p>
         </section>
 
@@ -108,17 +116,8 @@ export default function LandingPage() {
               </ol>
             </div>
             <div className="landing-report-wrap" data-reveal>
-              <div className="landing-report">
-                <div className="landing-report-head"><span className="landing-report-icon"><FileCheck2 size={23} aria-hidden="true" /></span><span>Результат вашей проверки<br /><small>Понятная структура заключения</small></span></div>
-                <h3>Не просто список изменений.<br />Основание для следующего шага.</h3>
-                <ul>
-                  <li><Check aria-hidden="true" /><div><strong>Что изменилось</strong><span>Обязанность и её исполнитель</span></div></li>
-                  <li><Check aria-hidden="true" /><div><strong>На чём основан вывод</strong><span>Редакции, пункты и исходный текст</span></div></li>
-                  <li><Check aria-hidden="true" /><div><strong>Что решил проверяющий</strong><span>Подтверждение, вопрос или отклонение</span></div></li>
-                </ul>
-                <div className="landing-report-foot"><ShieldCheck size={18} aria-hidden="true" /><p>До проверки человеком это проект заключения. Delphi помогает разобраться; окончательное решение принимаете вы.</p></div>
-              </div>
-              <p className="landing-workflow-note">Заключение доступно для экспорта в HTML и печати.</p>
+              <TransferExplainer />
+              <p className="landing-workflow-note">Заключение — HTML или печать. Таблица функций — CSV.</p>
             </div>
           </div>
         </section>
@@ -129,12 +128,12 @@ export default function LandingPage() {
         </section>
 
         <section className="landing-container landing-final" aria-labelledby="final-title" data-reveal>
-          <div><p className="landing-eyebrow">Начните с одного изменения</p><h2 id="final-title">Посмотрите, как функция<br />переходит к другому исполнителю.</h2><p>Один понятный пример: обязанность, два пункта и ваше решение.</p></div>
-          <Button asChild size="lg" className="landing-primary"><Link to="/analyses/demo-transfer/review?f=risk-register-transferred-across-documents&review=all">Открыть пример<ArrowRight aria-hidden="true" /></Link></Button>
+          <div><p className="landing-eyebrow">Начните с одного изменения</p><h2 id="final-title">Посмотрите, как функция<br />переходит к другому исполнителю.</h2><p>Delphi быстро показывает проверяемые изменения и вопросы, а решение принимает ответственный сотрудник, видя источник.</p></div>
+          <Button asChild size="lg" className="landing-primary"><Link to="/analyses/demo/review?f=f-svk&review=all">Открыть пример<ArrowRight aria-hidden="true" /></Link></Button>
         </section>
       </main>
 
-      <footer className="landing-container landing-footer"><Link to="/" className="landing-footer-brand">Delphi</Link><p>Ясность в документах. Ответственность в решениях.</p><Link to="/history">История анализов <ArrowRight size={14} aria-hidden="true" /></Link></footer>
+      <footer className="landing-container landing-footer"><Link to="/" className="landing-footer-brand">Delphi</Link><p>Проверяемые изменения. Решение человека.</p><Link to="/history">История анализов <ArrowRight size={14} aria-hidden="true" /></Link></footer>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/components/Link";
 import { ArrowRight, ArrowUpRight, Building2, Check, FileText, UserRoundCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusChip } from "@/components/StatusChip";
@@ -15,7 +15,7 @@ export function TransferExplainer() {
   return (
     <section className="transfer-explainer" aria-label="Как Delphi помогает проверить изменение">
       <div className="transfer-explainer__topline">
-        <span className="transfer-explainer__caption"><span aria-hidden="true" />Контрольный пример</span>
+        <span className="transfer-explainer__caption"><span aria-hidden="true" />Синтетика · контрольный пример</span>
         <span className="transfer-explainer__count">{step + 1} / 3</span>
       </div>
 
