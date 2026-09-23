@@ -11,6 +11,7 @@ from app.models import (
     SourceBlock,
 )
 from app.reporting.labels import LABELS
+from app.reporting.search import render_search
 from app.reporting.types import ReportSnapshot
 from app.schemas.common import Locale, TranslatedFinding, TranslatedPayload
 
@@ -95,10 +96,12 @@ def render_report(snapshot: ReportSnapshot, locale: Locale, payload: TranslatedP
                     f'<article id="finding-{finding.id}"><h3>{escape(text.title)}</h3>',
                     f"<p><small>{escape(finding.change_type)}{(' · ' + escape(finding.issue_type)) if finding.issue_type else ''}</small></p>",
                     f"<p>{escape(text.explanation)}</p><p><strong>{labels['recommendation']}:</strong> {escape(text.recommendation)}</p>",
-                    f"<p><strong>{labels['note']}:</strong> {escape(review.note) if review.note else labels['none']}</p>",
-                    f"<h4>{labels['evidence']}</h4>",
+                    f"<p><strong>{labels['note']}:</strong></p><pre>{escape(review.note) if review.note else labels['none']}</pre>",
                 ]
             )
+            if finding.search is not None:
+                parts.append(render_search(snapshot, finding.search, locale))
+            parts.append(f"<h4>{labels['evidence']}</h4>")
             for item in snapshot.evidence[finding.id]:
                 source = snapshot.sources[item.source_id]
                 document = snapshot.documents[source.document_id]

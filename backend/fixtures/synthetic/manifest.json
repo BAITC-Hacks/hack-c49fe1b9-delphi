@@ -1,0 +1,245 @@
+{
+  "schema_version": 1,
+  "synthetic": true,
+  "input_language": "ru",
+  "usage": "Acceptance expectations only. Do not provide this manifest to the agent or seed findings from it.",
+  "cases": [
+    {
+      "id": "missing",
+      "documents": [
+        {
+          "id": "before",
+          "path": "missing/before.md",
+          "side": "before",
+          "clauses": {
+            "1.1": "1.1. Служба рисков обязана ежемесячно обновлять реестр операционных рисков всей компании.",
+            "1.2": "1.2. Служба рисков обязана хранить выданные заключения в электронном архиве в течение пяти лет."
+          }
+        },
+        {
+          "id": "after",
+          "path": "missing/after.md",
+          "side": "after",
+          "clauses": {
+            "1.1": "1.1. Служба рисков обязана хранить выданные заключения в электронном архиве в течение пяти лет.",
+            "1.2": "1.2. Служба рисков обязана ежеквартально проводить обучение сотрудников по управлению рисками."
+          }
+        }
+      ],
+      "expected_findings": [
+        {
+          "id": "risk-register-missing",
+          "change_types": ["potentially_missing"],
+          "issue_types": [null],
+          "required_sources": ["before#1.1"],
+          "meaning": "The monthly company-wide operational-risk register duty has no counterpart in the supplied After set; do not claim it was abolished company-wide.",
+          "search": {
+            "complete": true,
+            "all_after_documents": ["after"],
+            "all_after_source_blocks_reviewed": true,
+            "candidate_source_ids": [],
+            "errors": []
+          }
+        },
+        {
+          "id": "archive-retained",
+          "change_types": ["retained"],
+          "issue_types": [null],
+          "required_sources": ["before#1.2", "after#1.1"],
+          "meaning": "The archive duty is retained despite renumbering."
+        }
+      ],
+      "forbidden_findings": [
+        {
+          "change_types": ["potentially_missing"],
+          "related_sources": ["before#1.2"],
+          "reason": "Renumbering does not remove the archive duty."
+        }
+      ]
+    },
+    {
+      "id": "overlap",
+      "documents": [
+        {
+          "id": "before",
+          "path": "overlap/before.md",
+          "side": "before",
+          "clauses": {
+            "1.1": "1.1. Отдел аудита является единственным ответственным за ежеквартальную проверку прав доступа во всех информационных системах компании."
+          }
+        },
+        {
+          "id": "after",
+          "path": "overlap/after.md",
+          "side": "after",
+          "clauses": {
+            "1.1": "1.1. Отдел аудита является единственным ответственным за ежеквартальную проверку прав доступа во всех информационных системах компании.",
+            "2.1": "2.1. Отдел соответствия является единственным ответственным за ежеквартальную проверку прав доступа во всех информационных системах компании."
+          }
+        }
+      ],
+      "expected_findings": [
+        {
+          "id": "exclusive-duty-duplicated",
+          "issue_types": ["overlap"],
+          "required_sources": ["after#1.1", "after#2.1"],
+          "meaning": "Both departments claim exclusive ownership of the same quarterly access review for all company systems; report possible duplication for review."
+        }
+      ],
+      "forbidden_findings": [
+        {
+          "change_types": ["potentially_missing"],
+          "related_sources": ["before#1.1"],
+          "reason": "The audit department's original duty remains present."
+        }
+      ]
+    },
+    {
+      "id": "conflict",
+      "documents": [
+        {
+          "id": "before",
+          "path": "conflict/before.md",
+          "side": "before",
+          "clauses": {
+            "1.1": "1.1. Казначейство обязано перечислять стандартные платежи только после письменного согласования службы рисков.",
+            "2.1": "2.1. Служба рисков обязана выдавать письменное согласование стандартных платежей до их перечисления казначейством."
+          }
+        },
+        {
+          "id": "after",
+          "path": "conflict/after.md",
+          "side": "after",
+          "clauses": {
+            "1.1": "1.1. Казначейство обязано перечислять каждый стандартный платеж до получения письменного согласования службы рисков.",
+            "2.1": "2.1. Служба рисков обязана запрещать казначейству перечисление любого стандартного платежа до получения своего письменного согласования."
+          }
+        }
+      ],
+      "expected_findings": [
+        {
+          "id": "incompatible-approval-sequence",
+          "issue_types": ["potential_conflict"],
+          "required_sources": ["after#1.1", "after#2.1"],
+          "meaning": "The same standard payments must and must not occur before approval. Flag incompatible instructions for human review without inventing a legal violation."
+        }
+      ],
+      "forbidden_findings": [
+        {
+          "issue_types": ["overlap"],
+          "related_sources": ["after#1.1", "after#2.1"],
+          "reason": "Executing a payment and controlling its approval are different duties; the problem is their incompatible timing."
+        }
+      ]
+    },
+    {
+      "id": "transfer",
+      "documents": [
+        {
+          "id": "before",
+          "path": "transfer/before.md",
+          "side": "before",
+          "clauses": {
+            "1.1": "1.1. Отдел аудита обязан ежемесячно обновлять реестр операционных рисков всей компании.",
+            "1.2": "1.2. Отдел аудита обязан ежеквартально проверять кассовые операции всей компании."
+          }
+        },
+        {
+          "id": "after-audit",
+          "path": "transfer/after-audit.md",
+          "side": "after",
+          "clauses": {
+            "1.1": "1.1. Отдел аудита обязан ежеквартально проверять кассовые операции всей компании."
+          }
+        },
+        {
+          "id": "after-risk",
+          "path": "transfer/after-risk.md",
+          "side": "after",
+          "clauses": {
+            "1.1": "1.1. Служба рисков обязана ежемесячно обновлять реестр операционных рисков всей компании."
+          }
+        }
+      ],
+      "expected_findings": [
+        {
+          "id": "risk-register-transferred-across-documents",
+          "change_types": ["transferred"],
+          "issue_types": [null],
+          "required_sources": ["before#1.1", "after-risk#1.1"],
+          "meaning": "The monthly company-wide risk-register duty moves from Audit to Risk in a different After document."
+        },
+        {
+          "id": "cash-review-retained",
+          "change_types": ["retained"],
+          "issue_types": [null],
+          "required_sources": ["before#1.2", "after-audit#1.1"],
+          "meaning": "Audit's quarterly cash review retains the same owner, scope and frequency."
+        }
+      ],
+      "forbidden_findings": [
+        {
+          "change_types": ["potentially_missing"],
+          "related_sources": ["before#1.1", "before#1.2"],
+          "reason": "Search both After documents; neither original duty disappears."
+        },
+        {
+          "issue_types": ["overlap", "potential_conflict"],
+          "related_sources": ["after-audit#1.1", "after-risk#1.1"],
+          "reason": "Different departments own different functions."
+        }
+      ]
+    },
+    {
+      "id": "distinct-scope",
+      "documents": [
+        {
+          "id": "before",
+          "path": "distinct-scope/before.md",
+          "side": "before",
+          "clauses": {
+            "1.1": "1.1. Отдел контроля Алматы является единственным ответственным за ежеквартальную проверку кассовых операций только в филиале Алматы.",
+            "2.1": "2.1. Отдел контроля Астаны является единственным ответственным за ежеквартальную проверку кассовых операций только в филиале Астаны."
+          }
+        },
+        {
+          "id": "after",
+          "path": "distinct-scope/after.md",
+          "side": "after",
+          "clauses": {
+            "1.1": "1.1. Отдел контроля Алматы является единственным ответственным за ежеквартальную проверку кассовых операций только в филиале Алматы.",
+            "2.1": "2.1. Отдел контроля Астаны является единственным ответственным за ежеквартальную проверку кассовых операций только в филиале Астаны."
+          }
+        }
+      ],
+      "expected_findings": [
+        {
+          "id": "almaty-duty-retained",
+          "change_types": ["retained"],
+          "issue_types": [null],
+          "required_sources": ["before#1.1", "after#1.1"],
+          "meaning": "Almaty's duty is unchanged and limited to the Almaty branch."
+        },
+        {
+          "id": "astana-duty-retained",
+          "change_types": ["retained"],
+          "issue_types": [null],
+          "required_sources": ["before#2.1", "after#2.1"],
+          "meaning": "Astana's duty is unchanged and limited to the Astana branch."
+        }
+      ],
+      "forbidden_findings": [
+        {
+          "issue_types": ["overlap", "potential_conflict"],
+          "related_sources": ["after#1.1", "after#2.1"],
+          "reason": "Similar actions on disjoint regional scopes do not duplicate ownership."
+        },
+        {
+          "change_types": ["potentially_missing"],
+          "related_sources": ["before#1.1", "before#2.1"],
+          "reason": "Both original duties are retained verbatim."
+        }
+      ]
+    }
+  ]
+}

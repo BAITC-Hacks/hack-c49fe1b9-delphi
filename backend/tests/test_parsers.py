@@ -29,10 +29,32 @@ def revision_8():
     return parse(path.name, path.read_bytes())
 
 
-@pytest.fixture
-def revision_9():
-    path = next((ROOT / "docs/hackaton/tracks").glob("*редакция_9*.md"))
+@pytest.fixture(params=["docx", "md"])
+def revision_9(request):
+    directory = ROOT / ("docs/sources" if request.param == "docx" else "docs/hackaton/tracks")
+    path = next(directory.glob(f"*редакция_9*.{request.param}"))
     return parse(path.name, path.read_bytes())
+
+
+def test_revision_9_docx_preserves_source_text_and_matches_markdown():
+    docx_path = next((ROOT / "docs/sources").glob("*редакция_9*.docx"))
+    md_path = next((ROOT / "docs/hackaton/tracks").glob("*редакция_9*.md"))
+    docx = parse(docx_path.name, docx_path.read_bytes())
+    markdown = parse(md_path.name, md_path.read_bytes())
+    docx_clauses = {
+        block.clause_no: block.normalized_text for block in docx.blocks if block.clause_no
+    }
+    md_clauses = {
+        block.clause_no: block.normalized_text for block in markdown.blocks if block.clause_no
+    }
+    assert len(docx_clauses) == 318
+    assert docx_clauses == md_clauses
+    assert "missing_annex_content:1" in docx.warnings
+    paragraphs = Document(docx_path).paragraphs
+    for block in docx.blocks:
+        locator = block.locator
+        original = paragraphs[locator["paragraph"] - 1].text
+        assert original[locator["start_offset"] : locator["end_offset"]] == block.original_text
 
 
 def test_real_docx_splits_joined_clauses_with_source_offsets(revision_8):

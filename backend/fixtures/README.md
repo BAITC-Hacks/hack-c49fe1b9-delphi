@@ -10,7 +10,9 @@
 
 These are deliberately weak, local-only demo credentials. Do not deploy them, reuse their password, or add a real user to this fixture.
 
-`demo_analysis.json` points to the supplied revision 8 DOCX and revision 9 Markdown export. The seed script parses and copies them using the same parser and storage rules as the upload route. It does not seed AI findings: a finding must come from a real run and carry valid evidence.
+`demo_analysis.json` points to the supplied revision 8 and revision 9 DOCX files. The seed script parses and copies them using the same parser and storage rules as the upload route. It does not seed AI findings: a finding must come from a real run and carry valid evidence. The `Демо DOCX` title creates a separate draft from an older seeded DOCX/Markdown comparison, keeping its documents and results intact.
+
+[Synthetic acceptance cases](synthetic/README.md) cover missing duties, overlap, potential conflict and false-positive controls separately from the official samples. Their expectations are test labels, not precomputed agent results.
 
 Run the checks without touching the database:
 

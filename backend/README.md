@@ -33,9 +33,11 @@ Routes call services; services own transactions and enforce business rules. Pars
 - Parsing gaps require `allow_partial: true`. Complete failure to read a document prevents starting the run. TOC removal alone is informational.
 - Extraction and many-to-many function matching preserve actors, units, scope, conditions and modality. Overlaps and potential conflicts require evidence from multiple After functions.
 - Missing-duty candidates require a search over the entire available After set. Incomplete inputs downgrade these findings to “needs review.”
+- HTML reports expose the saved search coverage, candidate source references and search errors alongside the finding. A complete search only covers the supplied documents.
 - AI references are checked against the frozen database sources before results are saved. Evidence excerpts are sliced from the original text by code.
 - Review changes increment `review_revision` in the same transaction. Reports and translations are cached by run, revision and language.
 - RU/KK/EN explanations and report headings; original quotations and reviewer notes remain unchanged. Language changes translate saved findings instead of rerunning comparison.
+- Review notes retain their submitted whitespace and line breaks; their text is excluded from model translation.
 
 Results are committed atomically after the agent returns. Progress and errors are persisted during execution; extracted intermediate objects are not checkpointed. A process restart marks queued/running work `interrupted`. A timeout marks the run `failed`; the user can create a repeat. A PostgreSQL advisory lock prevents a second application worker from starting against the same database.
 
@@ -92,13 +94,15 @@ Optional demo fixture instructions are in [fixtures/README.md](fixtures/README.m
 
 ## Verification status
 
-This preparation step uses Ruff, Python compilation/import checks and offline OpenAPI generation. No API server, image build, live AI request or end-to-end scenario was run after the request to limit work to code preparation. Earlier parser and mocked-agent checks passed before the final structural refactors; rerun them before integration:
+Feedback follow-up checks run locally without services: parser and mocked-agent regression tests, synthetic fixture integrity and report integrity tests, Ruff, and an offline comparison of the generated OpenAPI with the saved contract. No API server, image build, live AI request or end-to-end scenario is included in these checks.
 
 ```sh
 uv run ruff check app scripts migrations tests
-uv run pytest tests/test_parsers.py tests/test_agent.py
+uv run pytest -q
 ```
 
-The initial migration was checked against PostgreSQL earlier in the session. The later development-user migration is prepared in code. Full API/database behavior, the final refactors and real AI quality still need integration verification. Real supplied documents are Russian; Kazakh/English semantic quality needs separate examples. Scanned PDFs need OCR outside the current parser, tracked changes and absent annexes remain explicit coverage limitations.
+The initial migration was checked against PostgreSQL earlier in the session. The later development-user migration is prepared in code. Full API/database behavior and real AI quality still need integration verification. The supplied revision 9 DOCX is now included in the parser regression checks: all 318 numbered clauses match its Markdown export after normalization, and every extracted block retains exact paragraph offsets. The official demo seed uses both DOCX files.
+
+The [synthetic acceptance corpus](fixtures/synthetic/README.md) adds labelled missing-duty, overlap, potential-conflict and false-positive examples. Its checks establish readable inputs and valid expected source references; they do not establish that a real model produces the expected semantic findings. Keep synthetic and official results separate when measuring actual runs. Real supplied documents are Russian; Kazakh/English semantic quality needs separate examples. Scanned PDFs need OCR outside the current parser, tracked changes and absent annexes remain explicit coverage limitations.
 
 Product rules and acceptance examples: [architecture](../docs/architecture.md), [implementation plan](../docs/implementation-plan.md), [source analysis](../docs/source-analysis.md).

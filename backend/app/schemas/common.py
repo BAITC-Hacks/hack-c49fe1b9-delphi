@@ -26,6 +26,8 @@ class StartRun(RequestModel):
 
 
 class UpdateReview(RequestModel):
+    model_config = ConfigDict(str_strip_whitespace=False)
+
     status: ReviewStatus
     note: str = Field(max_length=4000)
 
