@@ -13,6 +13,7 @@ import { ExportMenu } from "@/components/ExportMenu";
 import { FunctionMapTable } from "@/components/FunctionMapTable";
 import { RiskCard } from "@/components/RiskCard";
 import { StatusChip } from "@/components/StatusChip";
+import { SummaryTiles } from "@/components/SummaryTiles";
 import { TracePanel } from "@/components/TracePanel";
 import { UnitTable } from "@/components/UnitTable";
 import { useAnalysis } from "@/hooks/useAnalysis";
@@ -133,6 +134,8 @@ export default function AnalysisPage() {
             <ExportMenu result={data} />
           </div>
         </div>
+
+        <SummaryTiles result={data} analysisId={id ?? DEMO_ID} />
 
         <Tabs defaultValue={findingId ? "functions" : "structure"} className="gap-4">
           <TabsList className="no-print w-full justify-start overflow-x-auto sm:w-auto">
