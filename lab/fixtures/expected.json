@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "purpose": "Manual evaluation checklist only; never include in model input or generate runtime findings from this file.",
+  "status": "authored_expectations_not_executed_results",
+  "source_identifiers": "Clause markers below are not source_id values. Resolve actual source IDs from the current parsed documents.",
+  "synthetic": {
+    "languages": ["ru", "kk", "en"],
+    "input_paths": "synthetic/{language}/{before,after}.md",
+    "kazakh_review_status": "draft_not_reviewed_by_fluent_human",
+    "cases": [
+      {
+        "id": "transfer",
+        "before_clauses": ["1.1"],
+        "after_clauses": ["6.1"],
+        "expected": "transferred",
+        "check": "The same company-wide monthly risk report moves from Head of Analytics to Risk Coordinator. Preserve parent role context and both sources.",
+        "must_not": ["Claim the reporting duty was lost", "Infer a department was abolished from a position heading"]
+      },
+      {
+        "id": "modality",
+        "before_clauses": ["1.2"],
+        "after_clauses": ["1.1"],
+        "expected": "modality_changed",
+        "check": "Annual completeness review of the risk register changes from mandatory to discretionary. Match meaning despite renumbering.",
+        "must_not": ["Classify as a completely absent duty", "Match clauses solely by their number"]
+      },
+      {
+        "id": "unmatched_archive",
+        "before_clauses": ["1.3"],
+        "after_clauses": [],
+        "expected": "potential_gap",
+        "check": "Search the entire provided After set for quarterly archiving of the access-policy exception log, record the search and state that no counterpart was found in the provided set.",
+        "must_not": ["Invent an After quotation", "Claim the real company no longer archives data", "Treat incomplete search as proof of loss"]
+      },
+      {
+        "id": "exclusive_duplicate",
+        "before_clauses": ["2.1"],
+        "after_clauses": ["2.1", "3.1"],
+        "expected": "overlap",
+        "check": "Two different roles hold exclusive final approval for the same northern-branch supplier list. Both After sources and role headings support the issue.",
+        "must_not": ["Ignore owner context because the clause bodies are identical", "Cite only one After source"]
+      },
+      {
+        "id": "self_audit",
+        "before_clauses": ["3.1"],
+        "after_clauses": ["2.2", "2.3"],
+        "expected": "potential_conflict",
+        "check": "The procurement role both concludes and audits the same northern-branch contracts; the prior independent review provides context. Request human review.",
+        "must_not": ["Invent a legal prohibition or external standard", "State that an actual violation or misconduct is proven"]
+      },
+      {
+        "id": "separate_scopes",
+        "before_clauses": ["4.1", "5.1"],
+        "after_clauses": ["4.1", "5.1"],
+        "expected": "preserved_without_overlap",
+        "check": "Training reports cover different branches, so matching actions do not create duplicate responsibility.",
+        "must_not": ["Label distinct northern and southern scopes as a conflict or duplicate"]
+      }
+    ]
+  },
+  "real_pair_manual_checklist": {
+    "source_of_expectations": "docs/source-analysis.md",
+    "before_input": "docs/sources/Положение_о_внутреннем_аудите_редакция_8_обезличено.docx",
+    "after_input": "docs/hackaton/tracks/Положение_о_внутреннем_аудите_редакция_9_обезличено.docx.md",
+    "cases": [
+      {
+        "id": "structure_3_4",
+        "before_clauses": ["3.4"],
+        "after_clauses": ["3.4"],
+        "check": "ДНМ and ДККМ remain listed; ДИТААД and ДОА are newly listed. Actual creation dates are unknown."
+      },
+      {
+        "id": "transfer_5_4_4",
+        "before_clauses": ["5.4", "5.4.4"],
+        "after_clauses": ["5.3", "5.3.2", "5.3.3"],
+        "check": "Work with results of other internal-control actors and insufficient/duplicate risk coverage transfers from the director of ДНМ to heads of ДИТААД/ДОА, retaining scope specialisation. Function is not lost."
+      },
+      {
+        "id": "modality_9_15",
+        "before_clauses": ["9.15"],
+        "after_clauses": ["9.15"],
+        "check": "Осуществляется анализ becomes может осуществляться анализ: weakened obligation, not disappearance."
+      },
+      {
+        "id": "rights_renumbering",
+        "before_clauses": ["5.8"],
+        "after_clauses": ["5.7"],
+        "check": "Renumbering of rights alone does not establish loss."
+      },
+      {
+        "id": "reporting_false_positive",
+        "before_clauses": [],
+        "after_clauses": ["5.1.6"],
+        "check": "Quarterly/annual reporting remains in the After document; do not infer its disappearance from a changed ДККМ subclause."
+      },
+      {
+        "id": "quality_control_scope",
+        "before_clauses": ["5.6.2", "5.6.3"],
+        "after_clauses": ["5.6", "5.5.2", "10", "11"],
+        "check": "Specific named powers may lack an explicit counterpart, but quality control itself remains. Report a question after searching, not complete loss of the function."
+      },
+      {
+        "id": "potential_stale_references_optional",
+        "before_clauses": ["5.8.1", "5.8.2"],
+        "after_clauses": ["5.10.2", "5.10.5", "5.8.1", "5.8.2", "5.7.1", "5.7.2"],
+        "check": "References resolve to existing numbers but may now point to prohibitions instead of former rights; do not claim a missing target solely because its meaning changed."
+      },
+      {
+        "id": "parser_and_coverage_limits",
+        "before_clauses": ["3.9", "3.10", "3.11", "5.5.3"],
+        "after_clauses": [],
+        "check": "Split joined numbered clauses with exact offsets; leave empty 5.5.3 empty; flag absent Appendix 1, preserve parent role context and never invent page numbers or an attachment."
+      }
+    ],
+    "must_not": [
+      "Invent a new conflict of interest in the real pair merely to demonstrate the feature",
+      "Treat a position heading as proof of an abolished department",
+      "Claim complete organisational coverage from two revisions of a single audit policy",
+      "Send this checklist to the model as the expected answer"
+    ]
+  }
+}

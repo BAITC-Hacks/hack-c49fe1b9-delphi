@@ -1,0 +1,2 @@
+# Optional: only needed to estimate tokens from prompt/request text.
+tiktoken>=0.12,<1
