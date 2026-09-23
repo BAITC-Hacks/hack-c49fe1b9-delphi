@@ -1,0 +1,3784 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Delphi API",
+    "description": "Compare organizational documents with traceable evidence and human review.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/analyses": {
+      "get": {
+        "tags": [
+          "analyses"
+        ],
+        "summary": "List Analyses",
+        "operationId": "list_analyses",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AnalysisListItem"
+                  },
+                  "type": "array",
+                  "title": "Response List Analyses"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request Entity Too Large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "analyses"
+        ],
+        "summary": "Create Analysis",
+        "operationId": "create_analysis",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAnalysis"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request Entity Too Large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analyses/{analysis_id}": {
+      "get": {
+        "tags": [
+          "analyses"
+        ],
+        "summary": "Get Analysis",
+        "operationId": "get_analysis",
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Analysis Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      }
+    },
+    "/api/analyses/{analysis_id}/repeat": {
+      "post": {
+        "tags": [
+          "analyses"
+        ],
+        "summary": "Repeat Analysis",
+        "operationId": "repeat_analysis",
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Analysis Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      }
+    },
+    "/api/analyses/{analysis_id}/documents": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Upload Document",
+        "operationId": "upload_document",
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Analysis Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_document"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      }
+    },
+    "/api/analyses/{analysis_id}/documents/{document_id}": {
+      "patch": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Update Document",
+        "operationId": "update_document",
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Analysis Id"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchDocument"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Delete Document",
+        "operationId": "delete_document",
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Analysis Id"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      }
+    },
+    "/api/analyses/{analysis_id}/documents/{document_id}/sources": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "List Document Sources",
+        "operationId": "list_document_sources",
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Analysis Id"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SourceResponse"
+                  },
+                  "title": "Response List Document Sources"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      }
+    },
+    "/api/analyses/{analysis_id}/runs": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Start Run",
+        "operationId": "start_run",
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Analysis Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartRun"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunAccepted"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Get Run",
+        "operationId": "get_run",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/functions": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "List Functions",
+        "operationId": "list_functions",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FunctionResponse"
+                  },
+                  "title": "Response List Functions"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/findings": {
+      "get": {
+        "tags": [
+          "findings"
+        ],
+        "summary": "List Findings",
+        "operationId": "list_findings",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FindingResponse"
+                  },
+                  "title": "Response List Findings"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      }
+    },
+    "/api/findings/{finding_id}/evidence": {
+      "get": {
+        "tags": [
+          "findings"
+        ],
+        "summary": "Get Finding Evidence",
+        "operationId": "get_finding_evidence",
+        "parameters": [
+          {
+            "name": "finding_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Finding Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EvidenceResponse"
+                  },
+                  "title": "Response Get Finding Evidence"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      }
+    },
+    "/api/findings/{finding_id}/review": {
+      "put": {
+        "tags": [
+          "findings"
+        ],
+        "summary": "Update Finding Review",
+        "operationId": "update_finding_review",
+        "parameters": [
+          {
+            "name": "finding_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Finding Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateReview"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewUpdated"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      }
+    },
+    "/api/sources/{source_id}": {
+      "get": {
+        "tags": [
+          "findings"
+        ],
+        "summary": "Get Source",
+        "operationId": "get_source",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/report": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Report",
+        "operationId": "get_report",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "ru",
+                "kk",
+                "en"
+              ],
+              "type": "string",
+              "default": "ru",
+              "title": "Lang"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "const": "html",
+              "type": "string",
+              "default": "html",
+              "title": "Format"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved report for the current review revision",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/functions.csv": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Export Functions",
+        "operationId": "export_functions",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "ru",
+                "kk",
+                "en"
+              ],
+              "type": "string",
+              "default": "ru",
+              "title": "Lang"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Function table; source values remain in their original language",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/translations": {
+      "post": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Create Translation",
+        "operationId": "create_translation",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Health",
+        "operationId": "get_health",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request Entity Too Large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AnalysisDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentResponse"
+            },
+            "type": "array",
+            "title": "Documents"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "documents",
+          "run"
+        ],
+        "title": "AnalysisDetail"
+      },
+      "AnalysisListItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "running",
+                  "completed",
+                  "partial",
+                  "failed",
+                  "interrupted"
+                ]
+              },
+              {
+                "type": "string",
+                "const": "draft"
+              }
+            ],
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "run_id",
+          "state"
+        ],
+        "title": "AnalysisListItem"
+      },
+      "AnalysisResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "created_at"
+        ],
+        "title": "AnalysisResponse"
+      },
+      "Body_upload_document": {
+        "properties": {
+          "side": {
+            "type": "string",
+            "enum": [
+              "before",
+              "after"
+            ],
+            "title": "Side"
+          },
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "side",
+          "file"
+        ],
+        "title": "Body_upload_document"
+      },
+      "CreateAnalysis": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "CreateAnalysis"
+      },
+      "DocumentResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "analysis_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Analysis Id"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "before",
+              "after"
+            ],
+            "title": "Side"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash"
+          },
+          "revision_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Label"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "md",
+              "docx",
+              "pdf",
+              "xlsx"
+            ],
+            "title": "Format"
+          },
+          "detected_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detected Language"
+          },
+          "parse_status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "parsed",
+              "partial",
+              "failed"
+            ],
+            "title": "Parse Status"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "block_count": {
+            "type": "integer",
+            "title": "Block Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "analysis_id",
+          "side",
+          "filename",
+          "hash",
+          "revision_label",
+          "format",
+          "detected_language",
+          "parse_status",
+          "warnings",
+          "created_at",
+          "block_count"
+        ],
+        "title": "DocumentResponse"
+      },
+      "ErrorDetail": {
+        "properties": {
+          "location": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "location",
+          "message",
+          "type"
+        ],
+        "title": "ErrorDetail"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorDetail"
+            },
+            "type": "array",
+            "title": "Details"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "details"
+        ],
+        "title": "ErrorResponse"
+      },
+      "EvidenceResponse": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Id"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "before",
+              "after"
+            ],
+            "title": "Side"
+          },
+          "clause_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clause No"
+          },
+          "original_text": {
+            "type": "string",
+            "title": "Original Text"
+          },
+          "excerpt": {
+            "type": "string",
+            "title": "Excerpt"
+          },
+          "locator": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Locator"
+          },
+          "evidence_role": {
+            "type": "string",
+            "enum": [
+              "before",
+              "after",
+              "context"
+            ],
+            "title": "Evidence Role"
+          },
+          "start_offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Offset"
+          },
+          "end_offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "document_id",
+          "filename",
+          "side",
+          "clause_no",
+          "original_text",
+          "excerpt",
+          "locator",
+          "evidence_role",
+          "start_offset",
+          "end_offset"
+        ],
+        "title": "EvidenceResponse"
+      },
+      "FindingResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "change_type": {
+            "type": "string",
+            "enum": [
+              "retained",
+              "reworded",
+              "transferred",
+              "split",
+              "merged",
+              "new",
+              "potentially_missing",
+              "changed",
+              "structure_changed"
+            ],
+            "title": "Change Type"
+          },
+          "issue_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "overlap",
+                  "potential_conflict",
+                  "modality_changed",
+                  "scope_changed",
+                  "insufficient_evidence"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issue Type"
+          },
+          "before_function_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Before Function Ids"
+          },
+          "after_function_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "After Function Ids"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          },
+          "recommendation": {
+            "type": "string",
+            "title": "Recommendation"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Source Ids"
+          },
+          "search": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SearchCoverage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "review": {
+            "$ref": "#/components/schemas/ReviewResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "run_id",
+          "title",
+          "change_type",
+          "issue_type",
+          "before_function_ids",
+          "after_function_ids",
+          "explanation",
+          "recommendation",
+          "source_ids",
+          "search",
+          "review"
+        ],
+        "title": "FindingResponse"
+      },
+      "FunctionResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "before",
+              "after"
+            ],
+            "title": "Side"
+          },
+          "owner_unit_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Owner Unit Ids"
+          },
+          "actor_original": {
+            "type": "string",
+            "title": "Actor Original"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "object": {
+            "type": "string",
+            "title": "Object"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "condition": {
+            "type": "string",
+            "title": "Condition"
+          },
+          "modality": {
+            "type": "string",
+            "title": "Modality"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Source Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "run_id",
+          "side",
+          "owner_unit_ids",
+          "actor_original",
+          "action",
+          "object",
+          "scope",
+          "condition",
+          "modality",
+          "source_ids"
+        ],
+        "title": "FunctionResponse"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status"
+          },
+          "ai_configured": {
+            "type": "boolean",
+            "title": "Ai Configured"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "ai_configured"
+        ],
+        "title": "HealthResponse"
+      },
+      "PatchDocument": {
+        "properties": {
+          "side": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "before",
+                  "after"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
+          },
+          "revision_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PatchDocument"
+      },
+      "ReviewResponse": {
+        "properties": {
+          "finding_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Finding Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "unreviewed",
+              "confirmed",
+              "needs_clarification",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "finding_id",
+          "status",
+          "note",
+          "updated_at"
+        ],
+        "title": "ReviewResponse"
+      },
+      "ReviewUpdated": {
+        "properties": {
+          "finding_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Finding Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "unreviewed",
+              "confirmed",
+              "needs_clarification",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "review_revision": {
+            "type": "integer",
+            "title": "Review Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "finding_id",
+          "status",
+          "note",
+          "updated_at",
+          "review_revision"
+        ],
+        "title": "ReviewUpdated"
+      },
+      "RunAccepted": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "partial",
+              "failed",
+              "interrupted"
+            ],
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "state"
+        ],
+        "title": "RunAccepted"
+      },
+      "RunCoverage": {
+        "properties": {
+          "allow_partial": {
+            "type": "boolean",
+            "title": "Allow Partial"
+          },
+          "input_partial": {
+            "type": "boolean",
+            "title": "Input Partial"
+          },
+          "input_warnings": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "type": "object",
+            "title": "Input Warnings"
+          },
+          "total_documents": {
+            "type": "integer",
+            "title": "Total Documents"
+          },
+          "total_sources": {
+            "type": "integer",
+            "title": "Total Sources"
+          },
+          "processed_sources": {
+            "type": "integer",
+            "title": "Processed Sources"
+          },
+          "before_functions": {
+            "type": "integer",
+            "title": "Before Functions"
+          },
+          "compared_before_functions": {
+            "type": "integer",
+            "title": "Compared Before Functions"
+          },
+          "after_functions": {
+            "type": "integer",
+            "title": "After Functions"
+          },
+          "reviewed_after_functions": {
+            "type": "integer",
+            "title": "Reviewed After Functions"
+          },
+          "structure_units": {
+            "type": "integer",
+            "title": "Structure Units"
+          },
+          "reviewed_structure_units": {
+            "type": "integer",
+            "title": "Reviewed Structure Units"
+          },
+          "unprocessed_source_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Unprocessed Source Ids"
+          },
+          "unreviewed_function_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Unreviewed Function Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "allow_partial",
+          "input_partial",
+          "input_warnings",
+          "total_documents",
+          "total_sources",
+          "processed_sources",
+          "before_functions",
+          "compared_before_functions",
+          "after_functions",
+          "reviewed_after_functions",
+          "structure_units",
+          "reviewed_structure_units",
+          "unprocessed_source_ids",
+          "unreviewed_function_ids"
+        ],
+        "title": "RunCoverage"
+      },
+      "RunDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "analysis_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Analysis Id"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "partial",
+              "failed",
+              "interrupted"
+            ],
+            "title": "State"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "extracting",
+              "comparing",
+              "checking_risks",
+              "validating",
+              "completed",
+              "partial",
+              "failed",
+              "interrupted"
+            ],
+            "title": "Stage"
+          },
+          "output_language": {
+            "type": "string",
+            "enum": [
+              "ru",
+              "kk",
+              "en"
+            ],
+            "title": "Output Language"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "pipeline_version": {
+            "type": "string",
+            "title": "Pipeline Version"
+          },
+          "review_revision": {
+            "type": "integer",
+            "title": "Review Revision"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/RunCoverage"
+          },
+          "structure": {
+            "items": {
+              "$ref": "#/components/schemas/StructureChange"
+            },
+            "type": "array",
+            "title": "Structure"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/UnitResponse"
+            },
+            "type": "array",
+            "title": "Units"
+          },
+          "finding_count": {
+            "type": "integer",
+            "title": "Finding Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "analysis_id",
+          "state",
+          "stage",
+          "output_language",
+          "model",
+          "pipeline_version",
+          "review_revision",
+          "coverage",
+          "structure",
+          "errors",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "units",
+          "finding_count"
+        ],
+        "title": "RunDetail"
+      },
+      "RunResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "analysis_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Analysis Id"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "partial",
+              "failed",
+              "interrupted"
+            ],
+            "title": "State"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "extracting",
+              "comparing",
+              "checking_risks",
+              "validating",
+              "completed",
+              "partial",
+              "failed",
+              "interrupted"
+            ],
+            "title": "Stage"
+          },
+          "output_language": {
+            "type": "string",
+            "enum": [
+              "ru",
+              "kk",
+              "en"
+            ],
+            "title": "Output Language"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "pipeline_version": {
+            "type": "string",
+            "title": "Pipeline Version"
+          },
+          "review_revision": {
+            "type": "integer",
+            "title": "Review Revision"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/RunCoverage"
+          },
+          "structure": {
+            "items": {
+              "$ref": "#/components/schemas/StructureChange"
+            },
+            "type": "array",
+            "title": "Structure"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "analysis_id",
+          "state",
+          "stage",
+          "output_language",
+          "model",
+          "pipeline_version",
+          "review_revision",
+          "coverage",
+          "structure",
+          "errors",
+          "created_at",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "RunResponse"
+      },
+      "SearchCoverage": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "const": "semantic_all_after_batches",
+            "title": "Method"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "reviewed_source_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Reviewed Source Ids"
+          },
+          "candidate_source_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Candidate Source Ids"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "input_partial": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Partial"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method",
+          "complete",
+          "reviewed_source_ids",
+          "candidate_source_ids",
+          "errors"
+        ],
+        "title": "SearchCoverage"
+      },
+      "SourceResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "clause_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clause No"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "original_text": {
+            "type": "string",
+            "title": "Original Text"
+          },
+          "locator": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Locator"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "document_id",
+          "clause_no",
+          "parent_id",
+          "original_text",
+          "locator"
+        ],
+        "title": "SourceResponse"
+      },
+      "StartRun": {
+        "properties": {
+          "output_language": {
+            "type": "string",
+            "enum": [
+              "ru",
+              "kk",
+              "en"
+            ],
+            "title": "Output Language"
+          },
+          "allow_partial": {
+            "type": "boolean",
+            "title": "Allow Partial"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "output_language",
+          "allow_partial"
+        ],
+        "title": "StartRun"
+      },
+      "StructureChange": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "before_unit_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Before Unit Ids"
+          },
+          "after_unit_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "After Unit Ids"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "retained",
+              "newly_listed",
+              "transformed",
+              "unmatched"
+            ],
+            "title": "Status"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Source Ids"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "before_unit_ids",
+          "after_unit_ids",
+          "status",
+          "source_ids",
+          "explanation"
+        ],
+        "title": "StructureChange"
+      },
+      "TranslateRequest": {
+        "properties": {
+          "locale": {
+            "type": "string",
+            "enum": [
+              "ru",
+              "kk",
+              "en"
+            ],
+            "title": "Locale"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "locale"
+        ],
+        "title": "TranslateRequest"
+      },
+      "TranslatedFinding": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          },
+          "recommendation": {
+            "type": "string",
+            "title": "Recommendation"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "explanation",
+          "recommendation"
+        ],
+        "title": "TranslatedFinding"
+      },
+      "TranslatedPayload": {
+        "properties": {
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/TranslatedFinding"
+            },
+            "type": "array",
+            "title": "Findings"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "findings",
+          "summary"
+        ],
+        "title": "TranslatedPayload"
+      },
+      "TranslationResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "review_revision": {
+            "type": "integer",
+            "title": "Review Revision"
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "ru",
+              "kk",
+              "en"
+            ],
+            "title": "Locale"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/TranslatedPayload"
+          },
+          "cached": {
+            "type": "boolean",
+            "title": "Cached"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "review_revision",
+          "locale",
+          "payload",
+          "cached"
+        ],
+        "title": "TranslationResponse"
+      },
+      "UnitResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "before",
+              "after"
+            ],
+            "title": "Side"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "department",
+              "role",
+              "group"
+            ],
+            "title": "Kind"
+          },
+          "name_original": {
+            "type": "string",
+            "title": "Name Original"
+          },
+          "parent_unit_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Unit Id"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Source Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "side",
+          "kind",
+          "name_original",
+          "parent_unit_id",
+          "source_ids"
+        ],
+        "title": "UnitResponse"
+      },
+      "UpdateReview": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "unreviewed",
+              "confirmed",
+              "needs_clarification",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "note"
+        ],
+        "title": "UpdateReview"
+      }
+    }
+  }
+}

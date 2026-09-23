@@ -1,0 +1,38 @@
+{
+  "title": "Reference: source-cited document comparison",
+  "note": "Public product page captured for the Delphi research comparison.",
+  "base": "https://docdiffai.com",
+  "tenant": "ncc",
+  "generatedAt": "2026-09-23T10:18:32.416Z",
+  "total": 1,
+  "failed": 0,
+  "authRedirects": 0,
+  "withJsErrors": 0,
+  "withFailedSteps": 0,
+  "results": [
+    {
+      "route": "/",
+      "shot": "default",
+      "steps": [],
+      "theme": "light",
+      "viewport": "desktop",
+      "file": "root__desktop__light.png",
+      "status": 200,
+      "ms": 4273,
+      "error": null,
+      "redirectedToLogin": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "net::ERR_ABORTED https://ad.doubleclick.net/ccm/s/collect?auid=1900065400.1790158711&gtm=45be69m0h2z8f_AW-18383052528za208zb9260911895zd9260911895xecxf1&fmt=8",
+        "net::ERR_ABORTED https://www.google.com/ccm/collect?rcb=11&frm=0&apvc=1&auid=1900065400.1790158711&dt=DocDiffAI%20%7C%20Compare%20document%20versions%20with%20source%20citations&tid=AW-18383052528&en=page_view&dl=http",
+        "net::ERR_ABORTED https://www.google.com/ccm/collect?rcb=11&frm=0&apvc=0&auid=1900065400.1790158711&dt=DocDiffAI%20%7C%20Compare%20document%20versions%20with%20source%20citations&tid=AW-18383052528&en=page_view&dl=http",
+        "net::ERR_ABORTED https://www.google.com/rmkt/collect/18383052528/?random=1790158711251&cv=11&fst=1790158711251&fmt=8&bg=ffffff&guid=ON&async=1&en=page_view&gtm=45be69m0h2za200zb9260911895zd9260911895xecxf1&gcd=13l3l3l",
+        "net::ERR_ABORTED https://analytics.google.com/g/collect?v=2&tid=G-564KK287XT&gtm=45je69m0h2v9260911895za200zd9260911895xf1&_p=1790158710122&_gaz=1&gcd=13l3l3l3l1l1&npa=0&dma=0&_eu=AAAAACAC&cid=971548700.1790158711&frm"
+      ],
+      "httpErrors": [],
+      "scrollables": []
+    }
+  ],
+  "reportImages": 1
+}

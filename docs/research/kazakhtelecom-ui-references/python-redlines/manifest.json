@@ -1,0 +1,32 @@
+{
+  "title": "Reference: Python-Redlines open-source DOCX comparison",
+  "note": "Public GitHub project page captured for the Delphi research comparison.",
+  "base": "https://github.com",
+  "tenant": "ncc",
+  "generatedAt": "2026-09-23T10:18:59.836Z",
+  "total": 1,
+  "failed": 0,
+  "authRedirects": 0,
+  "withJsErrors": 0,
+  "withFailedSteps": 0,
+  "results": [
+    {
+      "route": "/JSv4/Python-Redlines",
+      "shot": "default",
+      "steps": [],
+      "theme": "light",
+      "viewport": "desktop",
+      "file": "JSv4_Python-Redlines__desktop__light.png",
+      "status": 200,
+      "ms": 4160,
+      "error": null,
+      "redirectedToLogin": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "httpErrors": [],
+      "scrollables": []
+    }
+  ],
+  "reportImages": 1
+}
