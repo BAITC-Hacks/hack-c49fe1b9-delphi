@@ -1,6 +1,7 @@
 """Loopback-only lab API, separate from the team's backend."""
 import asyncio
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from typing import Literal
 
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
@@ -8,6 +9,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
 from .config import Settings, require_live_config
+from .costs import RunCosts
 from .models import Locale, Side
 from .pipeline import execute_run, upload_bytes, translate_saved
 from .reports import render_report, functions_csv
@@ -25,14 +27,16 @@ async def lifespan(app: FastAPI):
         app.state.store.recover_interrupted()
         app.state.settings = Settings()
         app.state.tasks = set()
-        yield
-        if app.state.tasks:
-            await asyncio.gather(*app.state.tasks, return_exceptions=True)
+        try:
+            yield
+        finally:
+            if app.state.tasks:
+                await asyncio.gather(*app.state.tasks, return_exceptions=True)
     finally:
         lock.release()
 
 
-app = FastAPI(title='Delphi lab', version='0.1.0', lifespan=lifespan,
+app = FastAPI(title='Delphi lab', version='0.2.0', lifespan=lifespan,
               description='Isolated document-processing API. /docs is the lab console, not the product UI. '
                           'Preprocess does not call an AI model. One process, one active run.')
 
@@ -64,6 +68,32 @@ class ReviewInput(BaseModel):
 
 class TranslationInput(BaseModel):
     language: Locale
+
+
+class ResumeInput(BaseModel):
+    max_calls: int | None = Field(default=None, gt=0)
+    timeout_seconds: int | None = Field(default=None, gt=0)
+
+
+def scheduled(run_id: str) -> bool:
+    return any(not task.done() and task.get_name() == run_id for task in app.state.tasks)
+
+
+def schedule_run(store: Store, run_id: str, settings: Settings, *, resume: bool = False) -> None:
+    async def execute():
+        try:
+            await asyncio.to_thread(execute_run, store, run_id, settings, resume=resume)
+        except Exception as exc:
+            # Preflight failures can precede the pipeline's own checkpoint handler.
+            # Preserve saved objects; never expose SDK/request exception bodies.
+            saved = store.run(run_id)
+            saved['errors'].append(f'Scheduled execution stopped ({type(exc).__name__}); saved results retained.')
+            if saved['state'] in {'running', 'queued'}:
+                saved.update(state='partial' if saved.get('functions') else 'failed', stage='stopped')
+            store.save_run(saved)
+    task = asyncio.create_task(execute(), name=run_id)
+    app.state.tasks.add(task)
+    task.add_done_callback(app.state.tasks.discard)
 
 
 @app.get('/', include_in_schema=False)
@@ -118,15 +148,48 @@ async def start(analysis_id: str, payload: RunInput):
     existing = store.analysis(analysis_id)['run']
     run = store.start(analysis_id, payload.mode, payload.language, settings.model, payload.allow_limited)
     if existing is None:
-        task = asyncio.create_task(asyncio.to_thread(execute_run, store, run['id'], settings))
-        app.state.tasks.add(task)
-        task.add_done_callback(app.state.tasks.discard)
+        schedule_run(store, run['id'], settings)
     return {'run_id': run['id'], 'state': run['state']}
 
 
 @app.get('/api/runs/{run_id}')
 def get_run(run_id: str):
     return app.state.store.run(run_id)
+
+
+@app.post('/api/runs/{run_id}/resume', status_code=202)
+async def resume(run_id: str, payload: ResumeInput):
+    store = app.state.store
+    run = store.run(run_id)
+    if run['state'] not in {'partial', 'failed', 'interrupted'} or run['mode'] != 'live':
+        raise ValueError('Only a stopped live run can be resumed.')
+    if any(not task.done() for task in app.state.tasks):
+        raise ValueError('Another lab run is active.')
+    if any(f['review']['status'] != 'unreviewed' or f['review']['note'] for f in run['findings']):
+        raise ValueError('Reviewed runs are frozen; create another analysis.')
+    settings = replace(app.state.settings, **payload.model_dump(exclude_none=True))
+    require_live_config(settings.model)
+    if settings.model != run['model']:
+        raise ValueError('A resumed run must use its original model.')
+    schedule_run(store, run_id, settings, resume=True)
+    return {'run_id': run_id, 'state': 'queued'}
+
+
+@app.get('/api/runs/{run_id}/functions')
+def functions(run_id: str):
+    return app.state.store.run(run_id)['functions']
+
+
+@app.get('/api/runs/{run_id}/structure')
+def structure(run_id: str):
+    run = app.state.store.run(run_id)
+    return {'units': run['units'], 'changes': run.get('structure', []), 'coverage': run['coverage']}
+
+
+@app.get('/api/runs/{run_id}/costs')
+def run_costs(run_id: str):
+    app.state.store.run(run_id)
+    return RunCosts(run_id).snapshot()
 
 
 @app.get('/api/runs/{run_id}/findings')
@@ -158,11 +221,15 @@ def evidence(run_id: str, finding_id: str):
 
 @app.patch('/api/runs/{run_id}/findings/{finding_id}/review')
 def review(run_id: str, finding_id: str, payload: ReviewInput):
+    if scheduled(run_id):
+        raise ValueError('Wait until the scheduled run stops before reviewing.')
     return app.state.store.review(run_id, finding_id, payload.status, payload.note)
 
 
 @app.post('/api/runs/{run_id}/translations')
 def translate(run_id: str, payload: TranslationInput):
+    if scheduled(run_id):
+        raise ValueError('Wait until the scheduled run stops before translating.')
     return translate_saved(app.state.store, run_id, payload.language, app.state.settings)
 
 

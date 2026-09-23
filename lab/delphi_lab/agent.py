@@ -19,7 +19,8 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from .models import AgentResult, Document, Evidence, Finding, Function, StrictModel, Unit
+from .models import (AgentResult, Document, Evidence, Finding, Function, StrictModel,
+                     Unit, SourceSearch, StructureChange)
 from .costs import RunCosts, warn as warn_costs
 
 _PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
@@ -43,6 +44,15 @@ class _Risks(StrictModel):
     reviewed_function_ids: list[str]
 
 
+class _Structure(StrictModel):
+    matches: list[StructureChange]
+
+
+class _SourceSearch(StrictModel):
+    reviewed_source_ids: list[str]
+    candidate_source_ids: list[str]
+
+
 class _TranslatedFinding(StrictModel):
     id: str
     title: str
@@ -54,8 +64,21 @@ class _Translation(StrictModel):
     findings: list[_TranslatedFinding]
 
 
+class _TranslatedStructure(StrictModel):
+    id: str
+    explanation: str
+
+
+class _StructureTranslation(StrictModel):
+    structure: list[_TranslatedStructure]
+
+
 class _Stopped(RuntimeError):
     pass
+
+
+class _OutputLimit(ValueError):
+    """Only this known provider reason permits bounded extraction splitting."""
 
 
 def _dump(value: Any) -> str:
@@ -81,7 +104,7 @@ def _score(query: str, text: str) -> float:
 
 
 def _function_text(function: Function) -> str:
-    return " ".join((function.action, function.object, function.scope, function.condition))
+    return " ".join((function.action, function.object, function.scope, function.condition, function.modality))
 
 
 def _schema(cls: type[StrictModel]) -> dict:
@@ -136,14 +159,14 @@ _SIDE = {"type": "string", "enum": ["before", "after"]}
 _STRING = {"type": "string"}
 _TOOLS = [
     _tool("search_clauses", "Lexical search of all blocks on one side; result includes search gaps.", {
-        "side": _SIDE, "query": _STRING,
+        "side": _SIDE, "query": _STRING, "offset": {"type": "integer", "minimum": 0},
         "filters": {"type": "object", "properties": {
             "document_id": {"type": ["string", "null"]},
             "clause_prefix": {"type": ["string", "null"]}},
             "required": ["document_id", "clause_prefix"], "additionalProperties": False}}),
     _tool("get_clause", "Read exact source text and parent context from this run.", {"source_id": _STRING}),
     _tool("get_unit_functions", "Read extracted functions of a known unit on the specified side.", {
-        "side": _SIDE, "unit_id": _STRING}),
+        "side": _SIDE, "unit_id": _STRING, "offset": {"type": "integer", "minimum": 0}}),
     _tool("check_references", "Locate numbered internal reference targets; no semantic/legal verdict.", {
         "document_id": _STRING}),
 ]
@@ -175,6 +198,8 @@ class _Runner:
         self.candidate_reviewed: set[str] = set()
         self.risk_reviewed: set[str] = set()
         self.unmatched_sweeps: dict[str, set[str]] = {}
+        self.source_sweeps: dict[str, SourceSearch] = {}
+        self.classified_after: set[str] = set()
         self.searches: list[dict] = []
         self.client = None
         self.costs = RunCosts(run_id)
@@ -203,6 +228,27 @@ class _Runner:
             self.processed = completed_ids(set(self.blocks), "unprocessed_source_ids")
             self.compared = completed_ids(before, "unprocessed_before_function_ids")
             self.risk_reviewed = completed_ids(after, "unprocessed_after_risk_function_ids")
+            # Old extraction-only snapshots remain readable. New absence claims
+            # require raw-source coverage even when a legacy function sweep finished.
+            for key, value in coverage.get("source_sweeps", {}).items():
+                search = SourceSearch.model_validate(value)
+                expected_side = "after" if key in before else "before" if key in after else None
+                if search.side != expected_side:
+                    raise ValueError("Resume source search has an unknown target or wrong side")
+                available = {b.id for b in self.blocks.values() if b.side == search.side}
+                if (not set(search.reviewed_source_ids) <= available
+                        or not set(search.candidate_source_ids) <= set(search.reviewed_source_ids)):
+                    raise ValueError("Resume source search contains unknown or unreviewed sources")
+                self.source_sweeps[key] = search.model_copy(update={"errors": [], "complete": False})
+            self.classified_after = set(coverage.get("classified_after_function_ids", []))
+            if not self.classified_after <= after:
+                raise ValueError("Resume classification contains unknown functions")
+            legacy_unmatched = {fid for finding in self.result.findings
+                                if finding.change_type == "unmatched" and finding.search is None
+                                for fid in finding.before_function_ids}
+            self.compared.difference_update(legacy_unmatched)
+            self.result.findings = [f for f in self.result.findings
+                                    if not (f.change_type == "unmatched" and f.search is None)]
             for target, visited in coverage.get("unmatched_sweeps", {}).items():
                 if target not in before or not set(visited) <= after:
                     raise ValueError("Resume search coverage contains unknown function IDs")
@@ -230,6 +276,8 @@ class _Runner:
         after = [f.id for f in self.result.functions if f.side == "after"]
         mapped_after = {key for finding in self.result.findings if finding.before_function_ids
                         for key in finding.after_function_ids}
+        structure_reviewed = {uid for match in self.result.structure
+                              for uid in match.before_unit_ids + match.after_unit_ids}
         self.result.coverage = {
             "stage": stage, "blocks_total": len(self.blocks),
             "blocks_processed": len(self.processed),
@@ -239,13 +287,18 @@ class _Runner:
             "candidate_reviewed_function_ids": sorted(self.candidate_reviewed),
             "after_functions_total": len(after), "after_functions_risk_reviewed": len(self.risk_reviewed),
             "unprocessed_after_risk_function_ids": sorted(set(after) - self.risk_reviewed),
-            "unclassified_after_function_ids": sorted(set(after) - mapped_after),
+            "unclassified_after_function_ids": sorted(set(after) - mapped_after - self.classified_after),
+            "classified_after_function_ids": sorted(self.classified_after),
+            "structure_units_total": sum(u.kind != "role" for u in self.result.units),
+            "structure_units_reviewed": len(structure_reviewed),
+            "unprocessed_structure_unit_ids": sorted({u.id for u in self.result.units if u.kind != "role"} - structure_reviewed),
             "parse_gaps": [{"document_id": d.id, "status": d.parse_status, "warnings": d.warnings}
                            for d in self.documents if d.parse_status != "ok"],
             "document_warnings": [{"document_id": d.id, "warnings": d.warnings}
                                   for d in self.documents if d.warnings],
             "unmatched_sweeps": {key: sorted(value) for key, value in self.unmatched_sweeps.items()},
-            "search_scope": "all available blocks; lexical retrieval; semantic unmatched sweeps recorded separately",
+            "source_sweeps": {key: value.model_dump() for key, value in self.source_sweeps.items()},
+            "search_scope": "semantic batches of every available source on the opposite side; lexical retrieval alone never proves absence",
             "risk_scope": "all extracted After targets with ranked candidates and bounded tools; not an exhaustive pairwise proof",
             "coverage_is_accuracy": False,
         }
@@ -332,6 +385,14 @@ class _Runner:
                                       "seconds": round(time.monotonic() - call_started, 2),
                                       "status": response.status, "response_id": response.id})
             if response.status != "completed":
+                details = getattr(response, "incomplete_details", None)
+                reason = details.get("reason") if isinstance(details, dict) else getattr(details, "reason", None)
+                # Sanitize provider metadata rather than persisting arbitrary text.
+                reason = reason if reason in {"max_output_tokens", "content_filter"} else "unspecified"
+                self.result.trace.append({"operation": "incomplete_response", "stage": stage,
+                                          "reason": reason, "response_id": response.id})
+                if response.status == "incomplete" and reason == "max_output_tokens":
+                    raise _OutputLimit(f"{stage}: output token limit; batch not accepted")
                 raise ValueError(f"{stage}: provider response is {response.status}; batch not accepted")
             function_calls = [item for item in response.output if item.type == "function_call"]
             if function_calls:
@@ -374,6 +435,18 @@ class _Runner:
 
     def execute_tool(self, name: str, args: dict) -> dict:
         started = time.monotonic()
+        expected = {"search_clauses": {"side", "query", "filters", "offset"},
+                    "get_clause": {"source_id"}, "get_unit_functions": {"side", "unit_id", "offset"},
+                    "check_references": {"document_id"}}
+        if name not in expected or not isinstance(args, dict):
+            raise ValueError("Unknown tool or invalid arguments")
+        # offset defaults preserve old saved calls and direct helper callers.
+        required = expected[name] - {"offset"}
+        if set(args) - expected[name] or not required <= set(args):
+            raise ValueError("Invalid tool argument names")
+        offset = args.get("offset", 0)
+        if type(offset) is not int or offset < 0:
+            raise ValueError("Tool offset must be a non-negative integer")
         if name == "search_clauses":
             side, query, filters = args["side"], args["query"], args["filters"]
             if side not in ("before", "after") or not isinstance(query, str) or not query.strip():
@@ -387,20 +460,24 @@ class _Runner:
                       and (not doc_id or b.document_id == doc_id)
                       and (not prefix or (b.clause_no or "").startswith(prefix))]
             ranked = sorted(corpus, key=lambda b: _score(query, b.normalized_text), reverse=True)
+            ranked = [block for block in ranked if _score(query, block.normalized_text) > 0.06]
             matches, chars = [], 0
-            for block in ranked[:10]:
-                if _score(query, block.normalized_text) <= 0.06:
-                    continue
+            for block in ranked[offset:offset + 10]:
                 item = self.source(block.id)
                 length = len(_dump(item))
                 if chars + length > max(2000, self.max_input_chars // 2):
-                    continue
+                    if not matches:
+                        raise ValueError("Search item exceeds tool output budget; use get_clause or a smaller input source")
+                    break
                 chars += length
                 matches.append(item)
             output = {"matches": matches, "scanned_blocks": len(corpus),
                       "available_side_blocks": sum(b.side == side for b in self.blocks.values()),
                       "all_side_scanned": not doc_id and not prefix,
                       "retrieval": "lexical; ranked results are limited; not semantic absence proof",
+                      "offset": offset, "total_matches": len(ranked),
+                      "next_offset": offset + len(matches) if offset + len(matches) < len(ranked) else None,
+                      "has_more": offset + len(matches) < len(ranked),
                       "input_complete": all(d.parse_status == "ok"
                                             for d in self.documents if d.side == side)}
             self.searches.append({"side": side, "query": query, "all_side_scanned": output["all_side_scanned"]})
@@ -414,13 +491,19 @@ class _Runner:
                 raise ValueError("Unknown unit ID or wrong side")
             functions = [f.model_dump() for f in self.result.functions if unit.id in f.owner_unit_ids]
             selected, chars = [], 0
-            for function in functions:
+            for function in functions[offset:offset + 20]:
                 size = len(_dump(function))
                 if chars + size > self.max_input_chars:
+                    if not selected:
+                        raise ValueError("Function exceeds tool output budget")
                     break
                 selected.append(function)
                 chars += size
-            output = {"functions": selected, "total": len(functions), "truncated": len(selected) < len(functions)}
+            next_offset = offset + len(selected)
+            output = {"functions": selected, "total": len(functions), "offset": offset,
+                      "has_more": next_offset < len(functions),
+                      "next_offset": next_offset if next_offset < len(functions) else None,
+                      "truncated": next_offset < len(functions)}
         elif name == "check_references":
             doc = next((d for d in self.documents if d.id == args["document_id"]), None)
             if doc is None:
@@ -468,6 +551,15 @@ class _Runner:
             yield batch, primary_ids, primary_ids | set(context), payload
 
     def extract(self) -> None:
+        minimum_calls = sum(len(list(self.extraction_batches([
+            {"id": b.id, "text": b.original_text, "kind": b.kind,
+             "clause_no": b.clause_no, "parent_id": b.parent_id}
+            for b in doc.blocks if b.kind != "toc" and b.id not in self.processed], doc.side)))
+            for doc in self.documents)
+        self.result.usage["minimum_remaining_extraction_calls_at_start"] = minimum_calls
+        self.result.trace.append({"operation": "extraction_plan", "minimum_calls": minimum_calls,
+                                  "remaining_call_budget": max(0, self.max_calls - self.calls),
+                                  "includes_comparison_structure_risks": False})
         for doc in self.documents:
             # TOC handling is explicit, and its blocks are counted as deliberately
             # skipped structure, not extracted duties.
@@ -478,7 +570,9 @@ class _Runner:
             primary = [{"id": b.id, "text": b.original_text, "kind": b.kind,
                         "clause_no": b.clause_no, "parent_id": b.parent_id}
                        for b in doc.blocks if b.kind != "toc" and b.id not in self.processed]
-            for batch, primary_ids, allowed, payload in self.extraction_batches(primary, doc.side):
+            pending = list(self.extraction_batches(primary, doc.side))
+            while pending:
+                batch, primary_ids, allowed, payload = pending.pop(0)
                 self.check_budget()
                 try:
                     parsed = self.request("extract", payload, _Extraction)
@@ -493,6 +587,11 @@ class _Runner:
                         stable = _id("u_", doc.side, unit.kind, _norm(unit.name_original))
                         local_units[unit.id] = stable
                         accepted_units.append(unit.model_copy(update={"id": stable}))
+                    for original, accepted in zip(parsed.units, accepted_units):
+                        parent = original.parent_unit_id
+                        if parent is not None and (parent not in local_units or parent == original.id):
+                            raise ValueError("Unit parent is unknown or refers to itself")
+                        accepted.parent_unit_id = local_units[parent] if parent is not None else None
                     accepted_functions = []
                     for function in parsed.functions:
                         self.validate_sources(function.source_ids, doc.side, allowed)
@@ -508,12 +607,36 @@ class _Runner:
                     units = {unit.id: unit for unit in self.result.units}
                     for unit in accepted_units:
                         if unit.id in units:
-                            unit = unit.model_copy(update={"source_ids": sorted(set(unit.source_ids + units[unit.id].source_ids))})
+                            previous = units[unit.id]
+                            if (previous.parent_unit_id and unit.parent_unit_id
+                                    and previous.parent_unit_id != unit.parent_unit_id):
+                                raise ValueError("Unit has inconsistent extracted parents")
+                            unit = unit.model_copy(update={
+                                "source_ids": sorted(set(unit.source_ids + previous.source_ids)),
+                                "parent_unit_id": unit.parent_unit_id or previous.parent_unit_id})
                         units[unit.id] = unit
+                    for unit in units.values():
+                        seen, current = set(), unit
+                        while current.parent_unit_id:
+                            if current.id in seen or current.parent_unit_id not in units:
+                                raise ValueError("Unit hierarchy contains a cycle or unknown parent")
+                            seen.add(current.id)
+                            current = units[current.parent_unit_id]
                     functions = {f.id: f for f in self.result.functions}
                     functions.update({f.id: f for f in accepted_functions})
                     self.result.units, self.result.functions = list(units.values()), list(functions.values())
                     self.processed.update(primary_ids)
+                except _OutputLimit as exc:
+                    if len(batch) > 1:
+                        middle = len(batch) // 2
+                        children = list(self.extraction_batches(batch[:middle], doc.side))
+                        children += list(self.extraction_batches(batch[middle:], doc.side))
+                        pending[0:0] = children
+                        self.result.trace.append({"operation": "split_unaccepted_extraction",
+                                                  "source_ids": sorted(primary_ids), "reason": "max_output_tokens",
+                                                  "children": len(children)})
+                    else:
+                        self.result.errors.append(f"Extraction {doc.id}/{batch[0]['id']}: {exc}; one source cannot be split safely")
                 except (ValueError, ValidationError) as exc:
                     self.result.errors.append(f"Extraction batch {doc.id}/{batch[0]['id']}: {exc}")
                 self.checkpoint("extract")
@@ -528,8 +651,10 @@ class _Runner:
 
     def validate_finding(self, finding: Finding, *, risk: bool = False) -> Finding:
         functions = {f.id: f for f in self.result.functions}
+        if finding.search is not None:
+            raise ValueError("Model findings cannot invent source-search coverage")
         for side, ids in (("before", finding.before_function_ids), ("after", finding.after_function_ids)):
-            if any(key not in functions or functions[key].side != side for key in ids):
+            if len(ids) != len(set(ids)) or any(key not in functions or functions[key].side != side for key in ids):
                 raise ValueError("Finding uses an unknown or wrong-side function ID")
         if not finding.evidence:
             raise ValueError("Finding has no evidence")
@@ -564,9 +689,9 @@ class _Runner:
             raise ValueError("Mapping requires valid functions and evidence on both sides")
         elif finding.issue_type not in ("none", "scope_changed", "modality_changed", "uncertainty"):
             raise ValueError("A comparison cannot declare a gap, overlap or conflict outside its dedicated pass")
-        if finding.change_type == "split" and len(set(finding.after_function_ids)) < 2:
+        if finding.change_type == "split" and (len(finding.before_function_ids) != 1 or len(set(finding.after_function_ids)) < 2):
             raise ValueError("A split requires multiple After functions")
-        if finding.change_type == "merged" and len(set(finding.before_function_ids)) < 2:
+        if finding.change_type == "merged" and (len(finding.after_function_ids) != 1 or len(set(finding.before_function_ids)) < 2):
             raise ValueError("A merge requires multiple Before functions")
         actual_queries = {search["query"] for search in self.searches}
         if any(query not in actual_queries for query in finding.search_queries):
@@ -574,8 +699,12 @@ class _Runner:
         return finding.model_copy(update={"id": _id("f_", finding.change_type, finding.issue_type,
                                                     sorted(finding.before_function_ids), sorted(finding.after_function_ids))})
 
-    def accept_findings(self, findings: list[Finding], *, risk: bool = False) -> None:
+    def accept_findings(self, findings: list[Finding], *, risk: bool = False,
+                        target_ids: set[str] | None = None) -> None:
         valid = [self.validate_finding(finding, risk=risk) for finding in findings]
+        if target_ids is not None and any(not target_ids.intersection(
+                f.after_function_ids if risk else f.before_function_ids) for f in valid):
+            raise ValueError("Finding is unrelated to the current target batch")
         current = {f.id: f for f in self.result.findings}
         current.update({f.id: f for f in valid})
         self.result.findings = list(current.values())
@@ -610,6 +739,114 @@ class _Runner:
         if batch:
             yield batch
 
+    def structure(self) -> None:
+        """Review the entire unit/group catalog; roles remain attached to duties."""
+        units = {u.id: u for u in self.result.units if u.kind != "role"}
+        covered = {uid for row in self.result.structure for uid in row.before_unit_ids + row.after_unit_ids}
+        if not covered <= set(units):
+            raise ValueError("Saved structure contains an unknown unit")
+        remaining = [u for u in units.values() if u.id not in covered]
+        groups: dict[tuple, dict[str, list[Unit]]] = {}
+        all_units = {u.id: u for u in self.result.units}
+        for unit in remaining:
+            parent = all_units.get(unit.parent_unit_id)
+            signature = (unit.kind, _norm(unit.name_original),
+                         None if parent is None else (parent.kind, _norm(parent.name_original)))
+            groups.setdefault(signature, {"before": [], "after": []})[unit.side].append(unit)
+        explanation = {
+            "ru": "Наименование, тип и указанный родитель совпадают. Это не означает неизменность обязанностей.",
+            "kk": "Атауы, түрі және көрсетілген бағыныстылығы сәйкес. Бұл міндеттер өзгермеді дегенді білдірмейді.",
+            "en": "The name, kind and recorded parent match. This does not establish unchanged duties.",
+        }[self.language]
+        for group in groups.values():
+            if len(group["before"]) == len(group["after"]) == 1:
+                before, after = group["before"][0], group["after"][0]
+                self.result.structure.append(StructureChange(
+                    id=_id("s_", before.id, after.id), before_unit_ids=[before.id], after_unit_ids=[after.id],
+                    status="retained", source_ids=sorted(set(before.source_ids + after.source_ids)),
+                    explanation=explanation))
+                covered.update((before.id, after.id))
+        remaining = [u for u in units.values() if u.id not in covered]
+        self.checkpoint("structure")
+        if not remaining:
+            return
+        payload = {"units": [{**u.model_dump(), "source_ids": u.source_ids[:3],
+                               "total_source_ids": len(u.source_ids)} for u in remaining],
+                   "already_matched_unit_ids": sorted(covered)}
+        try:
+            parsed = self.request("structure", payload, _Structure, tools=True)
+            expected, seen, staged = {u.id for u in remaining}, set(), []
+            for row in parsed.matches:
+                ids = row.before_unit_ids + row.after_unit_ids
+                if not ids or len(ids) != len(set(ids)) or seen.intersection(ids) or not set(ids) <= expected:
+                    raise ValueError("Structure repeats or invents unit IDs")
+                for side, keys in (("before", row.before_unit_ids), ("after", row.after_unit_ids)):
+                    if any(units[key].side != side for key in keys):
+                        raise ValueError("Structure cites a unit on the wrong side")
+                if not row.source_ids or any(key not in self.blocks for key in row.source_ids):
+                    raise ValueError("Structure source evidence is empty or unknown")
+                if any(not set(units[key].source_ids).intersection(row.source_ids) for key in ids):
+                    raise ValueError("Every structure unit must contribute evidence")
+                if row.status in {"retained", "transformed"} and not (row.before_unit_ids and row.after_unit_ids):
+                    raise ValueError("Mapped structure requires both sides")
+                if row.status == "newly_listed" and (row.before_unit_ids or not row.after_unit_ids):
+                    raise ValueError("Newly listed structure requires only After units")
+                if row.status == "unmatched" and (not row.before_unit_ids or row.after_unit_ids):
+                    raise ValueError("Unmatched structure requires only Before units")
+                seen.update(ids)
+                staged.append(row.model_copy(update={"id": _id("s_", row.status, sorted(ids))}))
+            if seen != expected:
+                raise ValueError("Structure did not cover every remaining unit")
+            self.result.structure.extend(staged)
+        except (ValueError, ValidationError) as exc:
+            self.result.errors.append(f"Structure: {exc}")
+        self.checkpoint("structure")
+
+    def search_sources(self, function: Function, side: str) -> SourceSearch:
+        """Inspect original body blocks, including duties extraction may have omitted."""
+        state = self.source_sweeps.setdefault(function.id, SourceSearch(side=side))
+        reviewed, candidates = set(state.reviewed_source_ids), set(state.candidate_source_ids)
+        sources = [self.source(b.id) for b in self.blocks.values() if b.side == side and b.kind != "toc"]
+        available = {item["id"] for item in sources}
+        if not reviewed <= available or not candidates <= reviewed:
+            raise ValueError("Saved source-search coverage is invalid")
+        errors = []
+        target_sources = [self.source(key) for key in function.source_ids]
+        pending = list(_batches([item for item in sources if item["id"] not in reviewed],
+                                max(1, int(self.max_input_chars * 0.5)), count=16))
+        while pending:
+            batch = pending.pop(0)
+            payload = {"function": function.model_dump(), "target_sources": target_sources,
+                       "search_side": side, "sources": batch}
+            if len(_dump(payload)) > self.max_input_chars and len(batch) > 1:
+                middle = len(batch) // 2
+                pending[0:0] = [batch[:middle], batch[middle:]]
+                continue
+            self.check_budget()
+            try:
+                result = self.request("source_search", payload, _SourceSearch)
+                expected = {item["id"] for item in batch}
+                if (len(result.reviewed_source_ids) != len(set(result.reviewed_source_ids))
+                        or set(result.reviewed_source_ids) != expected
+                        or not set(result.candidate_source_ids) <= expected):
+                    raise ValueError("Semantic source search has unknown or unreviewed IDs")
+                reviewed.update(expected)
+                candidates.update(result.candidate_source_ids)
+            except (ValueError, ValidationError) as exc:
+                errors.append(f"Source search {function.id}: {exc}")
+            state.reviewed_source_ids = sorted(reviewed)
+            state.candidate_source_ids = sorted(candidates)
+            state.errors = list(errors)
+            state.complete = False
+            self.checkpoint("source_search")
+        state.complete = (not errors and reviewed == available and bool(function.owner_unit_ids)
+                          and all(d.parse_status == "ok" for d in self.documents))
+        self.result.errors.extend(errors)
+        self.result.trace.append({"operation": "semantic_source_search", "function_id": function.id,
+                                  "side": side, "reviewed_sources": len(reviewed), "complete": state.complete,
+                                  "candidate_source_ids": sorted(candidates)})
+        return state
+
     def compare(self) -> None:
         before = [f for f in self.result.functions if f.side == "before"]
         after = [f for f in self.result.functions if f.side == "after"]
@@ -622,7 +859,11 @@ class _Runner:
                 parsed = self.request("compare", self.payload(targets, candidates, "candidates"), _Comparison, tools=True)
                 if set(parsed.reviewed_function_ids) != target_ids or set(parsed.unmatched_function_ids) - target_ids:
                     raise ValueError("Comparison coverage IDs do not match target IDs")
-                self.accept_findings(parsed.findings)
+                mapped_ids = {fid for finding in parsed.findings for fid in finding.before_function_ids}
+                if (target_ids - mapped_ids != set(parsed.unmatched_function_ids)
+                        or mapped_ids.intersection(parsed.unmatched_function_ids)):
+                    raise ValueError("Each target must be mapped or unresolved exactly once")
+                self.accept_findings(parsed.findings, target_ids=target_ids)
                 self.candidate_reviewed.update(target_ids)
                 for target in targets:
                     mapped = any(target.id in f.before_function_ids for f in parsed.findings)
@@ -633,60 +874,37 @@ class _Runner:
             except (ValueError, ValidationError) as exc:
                 self.result.errors.append(f"Comparison {sorted(target_ids)}: {exc}")
             self.checkpoint("compare")
-        # A lexical candidate miss is never enough for a missing-duty claim.
-        # Each unresolved target is semantically compared with every After tile.
+        # Lexical/extracted-function misses do not prove absence. Inspect every
+        # original opposite-side body source, including non-extracted duties.
         for target in unresolved:
             query = _function_text(target)
             self.execute_tool("search_clauses", {"side": "after", "query": query,
                                                "filters": {"document_id": None, "clause_prefix": None}})
-            visited = self.unmatched_sweeps.setdefault(target.id, set())
-            tiles: list[list[Function]] = []
-            tile: list[Function] = []
-            for candidate in after:
-                if tile and len(_dump(self.payload([target], tile + [candidate], "unmatched_sweep"))) > self.max_input_chars:
-                    tiles.append(tile)
-                    tile = []
-                tile.append(candidate)
-            if tile:
-                tiles.append(tile)
-            failed = False
-            mapped = any(target.id in f.before_function_ids and f.after_function_ids for f in self.result.findings)
-            for tile in tiles:
-                if {f.id for f in tile} <= visited:
-                    continue
-                self.check_budget()
-                try:
-                    parsed = self.request("compare", self.payload([target], tile, "unmatched_sweep"), _Comparison, tools=True)
-                    if set(parsed.reviewed_function_ids) != {target.id} or set(parsed.unmatched_function_ids) - {target.id}:
-                        raise ValueError("Unmatched sweep coverage IDs are invalid")
-                    self.accept_findings(parsed.findings)
-                    visited.update(f.id for f in tile)
-                    mapped |= any(target.id in f.before_function_ids for f in parsed.findings)
-                except (ValueError, ValidationError) as exc:
-                    failed = True
-                    self.result.errors.append(f"Unmatched sweep {target.id}: {exc}")
+            try:
+                search = self.search_sources(target, "after")
+            except _Stopped:
+                self.add_unresolved(target, query, False, self.source_sweeps.get(target.id, SourceSearch(side="after")))
                 self.checkpoint("search_unmatched")
-            if mapped:
-                self.compared.add(target.id)
-            elif not failed and visited == {f.id for f in after}:
-                complete = (set(self.blocks) == self.processed and all(
-                    d.parse_status == "ok" for d in self.documents))
-                self.add_unresolved(target, query, complete)
+                raise
+            self.add_unresolved(target, query, search.complete and not search.candidate_source_ids, search)
+            available = {b.id for b in self.blocks.values() if b.side == "after" and b.kind != "toc"}
+            if set(search.reviewed_source_ids) == available and not search.errors:
                 self.compared.add(target.id)
             self.checkpoint("search_unmatched")
 
-    def add_unresolved(self, function: Function, query: str, complete: bool) -> None:
+    def add_unresolved(self, function: Function, query: str, complete: bool,
+                       search: SourceSearch | None = None) -> None:
         texts = {
             "ru": ("Соответствие не найдено в предоставленном комплекте", "Недостаточно данных для вывода о соответствии",
-                   "Выполнен поиск по доступным блокам «После» и проверены все извлечённые функции. Это не доказывает прекращение работы вне комплекта документов.",
+                   "Семантически проверены все доступные исходные пункты «После». Это не доказывает прекращение работы вне комплекта документов.",
                    "Есть пробелы чтения или извлечения. Нельзя заключать, что обязанность утрачена.",
                    "Уточните исполнителя и полноту документов у ответственного сотрудника."),
             "kk": ("Берілген құжаттар жиынтығында сәйкестік табылмады", "Сәйкестікті анықтау үшін дерек жеткіліксіз",
-                   "Қолжетімді «Кейін» блоктары ізделіп, алынған функциялар қаралды. Бұл құжаттардан тыс жұмыс тоқтатылғанын дәлелдемейді.",
+                   "Қолжетімді «Кейін» бастапқы тармақтарының барлығы тексерілді. Бұл құжаттардан тыс жұмыс тоқтатылғанын дәлелдемейді.",
                    "Оқу немесе дерек алу толық емес. Міндет жоғалды деген қорытынды жасауға болмайды.",
                    "Орындаушыны және құжаттардың толықтығын жауапты қызметкерден нақтылаңыз."),
             "en": ("No counterpart found in the provided document set", "Insufficient evidence to determine correspondence",
-                   "Available After blocks were searched and all extracted After functions reviewed. This does not prove work ceased outside the provided documents.",
+                   "Every available original After body source was semantically reviewed. This does not prove work ceased outside the provided documents.",
                    "Parsing or extraction has gaps. A lost duty cannot be concluded.",
                    "Ask the responsible employee to clarify the owner and completeness of the documents."),
         }[self.language]
@@ -695,10 +913,48 @@ class _Runner:
                           before_function_ids=[function.id], after_function_ids=[],
                           explanation=texts[2 if complete else 3], recommendation=texts[4],
                           evidence=[Evidence(source_id=key, evidence_role="before") for key in function.source_ids],
-                          search_queries=[query])
+                          search_queries=[query], search=search.model_copy(deep=True) if search else None)
+        if search and search.candidate_source_ids:
+            finding.explanation = {
+                "ru": "В исходных пунктах «После» найдены возможные соответствия. Связь функций требует проверки; потеря обязанности не установлена.",
+                "kk": "«Кейін» дереккөздерінен ықтимал сәйкестіктер табылды. Функциялар байланысын тексеру қажет; міндеттің жоғалғаны анықталған жоқ.",
+                "en": "Possible counterparts were found in original After sources. The mapping needs review; a lost duty is not established.",
+            }[self.language]
+            finding.evidence.extend(Evidence(source_id=key, evidence_role="context") for key in search.candidate_source_ids)
         current = {f.id: f for f in self.result.findings}
         current[finding.id] = finding
         self.result.findings = list(current.values())
+
+    def additions(self) -> None:
+        mapped = {fid for row in self.result.findings if row.before_function_ids for fid in row.after_function_ids}
+        for function in self.result.functions:
+            if function.side != "after" or function.id in mapped | self.classified_after:
+                continue
+            search = self.search_sources(function, "before")
+            added = search.complete and not search.candidate_source_ids
+            titles = {"ru": ("Обязанность впервые указана в комплекте «После»", "Происхождение обязанности требует проверки"),
+                      "kk": ("Міндет «Кейін» жиынтығында алғаш көрсетілген", "Міндеттің шығу тегін тексеру қажет"),
+                      "en": ("Duty first listed in the supplied After set", "Duty provenance needs review")}
+            explanations = {
+                "ru": "Проверены доступные исходные пункты «До». Отсутствие соответствия в комплекте не доказывает дату появления работы.",
+                "kk": "Қолжетімді «Бұрын» дереккөздері тексерілді. Жиынтықта сәйкестіктің болмауы жұмыстың басталу уақытын дәлелдемейді.",
+                "en": "Available original Before sources were checked. Absence of a counterpart does not establish when the work began.",
+            }
+            finding = Finding(id=_id("f_", "addition_review", function.id), title=titles[self.language][0 if added else 1],
+                change_type="added" if added else "review", issue_type="none" if added else "uncertainty",
+                before_function_ids=[], after_function_ids=[function.id], explanation=explanations[self.language],
+                recommendation={"ru": "Подтвердите исполнителя и полноту источников.", "kk": "Орындаушыны және дереккөздердің толықтығын растаңыз.",
+                                "en": "Confirm the owner and completeness of sources."}[self.language],
+                evidence=[Evidence(source_id=key, evidence_role="after") for key in function.source_ids]
+                         + [Evidence(source_id=key, evidence_role="context") for key in search.candidate_source_ids],
+                search=search.model_copy(deep=True))
+            current = {f.id: f for f in self.result.findings}
+            current[finding.id] = finding
+            self.result.findings = list(current.values())
+            available = {b.id for b in self.blocks.values() if b.side == "before" and b.kind != "toc"}
+            if set(search.reviewed_source_ids) == available and not search.errors:
+                self.classified_after.add(function.id)
+            self.checkpoint("additions")
 
     def risks(self) -> None:
         after = [f for f in self.result.functions if f.side == "after"]
@@ -710,7 +966,7 @@ class _Runner:
                 parsed = self.request("risks", self.payload(targets, candidates, "after_risks"), _Risks, tools=True)
                 if set(parsed.reviewed_function_ids) != target_ids:
                     raise ValueError("Risk coverage IDs do not match target IDs")
-                self.accept_findings(parsed.findings, risk=True)
+                self.accept_findings(parsed.findings, risk=True, target_ids=target_ids)
                 self.risk_reviewed.update(target_ids)
             except (ValueError, ValidationError) as exc:
                 self.result.errors.append(f"Risk pass {sorted(target_ids)}: {exc}")
@@ -741,12 +997,23 @@ def run_agent(documents: list[Document], *, model: str, language: str = "ru",
         if not os.environ.get("OPENAI_API_KEY"):
             raise _Stopped("OPENAI_API_KEY is not configured; no AI analysis was performed.")
         runner.extract()
+        runner.structure()
         runner.compare()
         runner.risks()
+        runner.additions()
         before = {f.id for f in runner.result.functions if f.side == "before"}
         after = {f.id for f in runner.result.functions if f.side == "after"}
+        if not before or not after:
+            runner.result.errors.append("No functions extracted on one side; semantic completeness cannot be established.")
+        if any(not f.owner_unit_ids for f in runner.result.functions):
+            runner.result.errors.append("Some function owners are unresolved; human clarification is required.")
+        structure_units = {u.id for u in runner.result.units if u.kind != "role"}
+        reviewed_units = {uid for row in runner.result.structure for uid in row.before_unit_ids + row.after_unit_ids}
+        mapped_after = {fid for row in runner.result.findings if row.before_function_ids for fid in row.after_function_ids}
         runner.result.complete = (not runner.result.errors and runner.processed == set(runner.blocks)
                                   and before == runner.compared and after == runner.risk_reviewed
+                                  and structure_units == reviewed_units
+                                  and after <= mapped_after | runner.classified_after
                                   and all(d.parse_status == "ok" for d in documents))
     except (_Stopped, ValueError, ValidationError) as exc:
         runner.result.errors.append(str(exc))

@@ -8,7 +8,7 @@ import io
 import json
 import re
 
-from .storage import Store
+from .storage import Store, validate_translation
 from .validation import materialize_evidence
 
 LABELS = {
@@ -65,6 +65,22 @@ LABELS = {
     },
 }
 
+for language, additions in {
+    'ru': {'retained': 'Сохранено', 'newly_listed': 'Впервые перечислено', 'transformed': 'Преобразовано',
+           'unmatched': 'Соответствие структуры требует проверки', 'search_coverage': 'Покрытие поиска по источникам',
+           'processed': 'Проверено', 'candidates': 'Кандидаты', 'complete_search': 'Полный поиск',
+           'yes': 'Да', 'no': 'Нет', 'structure_unreviewed': 'Структурные соответствия не завершены'},
+    'kk': {'retained': 'Сақталған', 'newly_listed': 'Алғаш көрсетілген', 'transformed': 'Өзгертілген',
+           'unmatched': 'Құрылым сәйкестігін тексеру қажет', 'search_coverage': 'Дереккөздер бойынша іздеу қамтуы',
+           'processed': 'Тексерілген', 'candidates': 'Үміткерлер', 'complete_search': 'Толық іздеу',
+           'yes': 'Иә', 'no': 'Жоқ', 'structure_unreviewed': 'Құрылымдық салыстыру аяқталған жоқ'},
+    'en': {'retained': 'Retained', 'newly_listed': 'Newly listed', 'transformed': 'Transformed',
+           'unmatched': 'Structure counterpart requires review', 'search_coverage': 'Source search coverage',
+           'processed': 'Reviewed', 'candidates': 'Candidates', 'complete_search': 'Complete search',
+           'yes': 'Yes', 'no': 'No', 'structure_unreviewed': 'Structure comparison is unfinished'},
+}.items():
+    LABELS[language].update(additions)
+
 
 def inline_diff(before: str, after: str) -> str:
     """Escaped word diff for display; the authoritative quotations stay separate."""
@@ -86,14 +102,18 @@ def localized_run(store: Store, run_id: str, lang: str, snapshot: dict | None = 
     if lang not in LABELS:
         raise ValueError('Supported report languages: ru, kk, en')
     run = deepcopy(snapshot) if snapshot is not None else store.run(run_id)
-    if lang != run['output_language'] and run['findings']:
+    if lang != run['output_language'] and (run['findings'] or run.get('structure')):
         translation = store.translation(run_id, run['review_revision'], lang)
         if translation is None:
             raise ValueError('Translation for this review revision is not saved. Request translation first.')
+        validate_translation(run, lang, translation)
         items = {f['id']: f for f in translation['findings']}
         for finding in run['findings']:
             for field in ('title', 'explanation', 'recommendation'):
                 finding[field] = items[finding['id']][field]
+        translated_structure = {item['id']: item for item in translation.get('structure', [])}
+        for item in run.get('structure', []):
+            item['explanation'] = translated_structure[item['id']]['explanation']
     return run
 
 
@@ -126,13 +146,25 @@ def render_report(store: Store, run_id: str, lang: str = 'ru', snapshot: dict | 
     def finding_card(f: dict) -> str:
         refs = materialize_evidence(f, sources)
         status = f['review']['status']
+        search = f.get('search')
+        search_html = ''
+        if search:
+            reviewed = search.get('reviewed_source_ids', [])
+            candidates = search.get('candidate_source_ids', [])
+            search_html = (f'<details><summary>{t("search_coverage")}: {t("processed")} {len(reviewed)} · '
+                           f'{t("complete_search")}: {t("yes" if search.get("complete") else "no")}</summary>'
+                           f'<p>{e(search.get("method", ""))} · {t("candidates")}: {len(candidates)}</p>'
+                           + ''.join(source_quote(sid) for sid in candidates)
+                           + '<ul>' + ''.join(f'<li>{e(error)}</li>' for error in search.get('errors', []))
+                           + '</ul><pre>' + e(json.dumps(reviewed, ensure_ascii=False)) + '</pre></details>')
         return (f'<article id="{e(f["id"])}"><div class="tags"><span>{e(f["change_type"])}</span>'
                 f'<span>{e(f["issue_type"])}</span><span>{t(status)}</span></div>'
                 f'<h3>{e(f["title"])}</h3><p>{e(f["explanation"])}</p>'
                 f'<p><strong>{t("action")}:</strong> {e(f["recommendation"])}</p>'
                 f'<div class="evidence">' + ''.join(source_quote(r['source_id'], r['excerpt']) for r in refs) + '</div>'
                 + (f'<p>{t("search")}: {e("; ".join(f["search_queries"]))}</p>' if f['search_queries'] else '')
-                + (f'<p>{t("note")}: {e(f["review"]["note"])}</p>' if f['review']['note'] else '')
+                + search_html
+                + (f'<p class="review-note">{t("note")}: {e(f["review"]["note"])}</p>' if f['review']['note'] else '')
                 + '</article>')
 
     active = [f for f in run['findings'] if f['review']['status'] != 'rejected']
@@ -152,6 +184,7 @@ section{{margin-bottom:38px}}article,.panel{{background:white;padding:24px;borde
 .notice{{border-left:4px solid #bf852b;background:#fff4db;padding:16px 22px;margin-top:16px}}.evidence{{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}}
 .source{{padding:14px;margin:8px 0;background:#f5f7f7;border-left:3px solid #879b9b;overflow-wrap:anywhere}}.source.after{{border-color:#2e8c6a}}
 blockquote{{margin:12px 0;white-space:pre-wrap}}code,pre{{font-size:12px;overflow-wrap:anywhere;white-space:pre-wrap}}small{{color:var(--muted)}}
+.review-note{{white-space:pre-wrap}}
 del{{background:#ffe0de;color:#8b302a}}ins{{background:#d8f1e1;color:#175b39;text-decoration:none}}.redline{{white-space:pre-wrap;margin:16px 0}}
 details{{margin:12px 0}}summary{{cursor:pointer}}table{{width:100%;border-collapse:collapse}}td,th{{padding:10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}}
 .counts{{display:flex;gap:24px;flex-wrap:wrap}}.counts strong{{font-size:30px;display:block}}footer{{color:var(--muted);font-size:13px;padding:24px 0}}
@@ -195,6 +228,16 @@ details{{margin:12px 0}}summary{{cursor:pointer}}table{{width:100%;border-collap
         html += ''.join(source_quote(sid) for sid in after_ids) + '</details>'
     html += '</div></section>'
     html += f'<section id="structure"><h2>{t("structure")}</h2><div class="panel">'
+    unit_lookup = {unit['id']: unit for unit in run['units']}
+    for change in run.get('structure', []):
+        before_names = ' / '.join(unit_lookup[key]['name_original'] for key in change['before_unit_ids'])
+        after_names = ' / '.join(unit_lookup[key]['name_original'] for key in change['after_unit_ids'])
+        html += (f'<article id="{e(change["id"])}"><div class="tags"><span>{t(change["status"])}</span></div>'
+                 f'<h3>{e(before_names or "—")} → {e(after_names or "—")}</h3>'
+                 f'<p>{e(change["explanation"])}</p><details><summary>{t("evidence")}</summary>'
+                 + ''.join(source_quote(sid) for sid in change['source_ids']) + '</details></article>')
+    if run['units'] and not run.get('structure'):
+        html += f'<p class="notice">{t("structure_unreviewed")}</p>'
     groups = {}
     for unit in run['units']:
         key = (unit['name_original'].casefold().strip(), unit['kind'])
