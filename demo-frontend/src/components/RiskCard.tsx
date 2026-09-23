@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { RefButton } from "@/components/RefButton";
+import { ReviewChip } from "@/components/ReviewControls";
 import { StatusChip } from "@/components/StatusChip";
 import { FUNCTION_STATUS } from "@/lib/status";
 import type { EvidenceRequest, Risk } from "@/types";
@@ -20,6 +21,8 @@ export function RiskCard({ risk, onEvidence }: Props) {
       status: risk.kind,
       before: refs.filter((_, i) => sideOf(i) === "before"),
       after: refs.filter((_, i) => sideOf(i) === "after"),
+      finding_id: risk.id,
+      review: risk.review,
     });
 
   return (
@@ -28,6 +31,7 @@ export function RiskCard({ risk, onEvidence }: Props) {
         <div className="flex flex-wrap items-center gap-2">
           <StatusChip status={risk.kind} kind="risk" />
           <h3 className="text-base font-semibold">{risk.title}</h3>
+          <ReviewChip review={risk.review} className="ml-auto" />
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">

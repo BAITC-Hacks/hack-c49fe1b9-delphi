@@ -1,6 +1,9 @@
 import type { AnalysisResult } from "@/types";
 import { citeRef } from "@/lib/format";
-import { FUNCTION_STATUS, RISK_KIND, UNIT_STATUS } from "@/lib/status";
+import { FUNCTION_STATUS, REVIEW_STATUS, RISK_KIND, UNIT_STATUS } from "@/lib/status";
+import type { Review } from "@/types";
+
+const reviewLabel = (r?: Review) => (r && r.status !== "unreviewed" ? REVIEW_STATUS[r.status].label : "");
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -32,9 +35,10 @@ export function buildHtml(r: AnalysisResult): string {
   const functions = r.functions
     .map((f) => {
       const after = (f.after ?? []).map((a) => `${esc(a.unit)} — ${esc(citeRef(a.ref))}`).join("<br/>") || "—";
+      const review = reviewLabel(f.review);
       return `<tr><td>${esc(f.title)}</td><td>${f.before ? `${esc(f.before.unit)} — ${esc(citeRef(f.before.ref))}` : "—"}</td><td>${after}</td><td>${esc(
         FUNCTION_STATUS[f.status].label,
-      )}</td><td>${f.confidence != null ? `${Math.round(f.confidence * 100)} %` : "—"}</td><td>${esc(f.note ?? "")}</td></tr>`;
+      )}${review ? `<br/><small>${esc(review)}</small>` : ""}</td><td>${f.confidence != null ? `${Math.round(f.confidence * 100)} %` : "—"}</td><td>${esc(f.note ?? "")}</td></tr>`;
     })
     .join("");
 
@@ -85,6 +89,8 @@ export function buildCsv(r: AnalysisResult): string {
     "after_clause",
     "confidence",
     "note",
+    "review",
+    "review_note",
   ];
   const rows = r.functions.map((f) =>
     [
@@ -96,6 +102,8 @@ export function buildCsv(r: AnalysisResult): string {
       (f.after ?? []).map((a) => citeRef(a.ref)).join(" | "),
       f.confidence != null ? String(Math.round(f.confidence * 100)) : "",
       f.note ?? "",
+      reviewLabel(f.review),
+      f.review?.note ?? "",
     ]
       .map(q)
       .join(","),

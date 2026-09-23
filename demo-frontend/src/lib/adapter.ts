@@ -27,7 +27,7 @@ import type {
   Unit,
   UnitStatus,
 } from "@/types";
-import { FUNCTION_STATUS, RISK_KIND } from "@/lib/status";
+import { FUNCTION_STATUS, REVIEW_STATUS, RISK_KIND } from "@/lib/status";
 
 /*
  * Maps the backend's granular API (backend/openapi.json) onto the UI contract in types.ts.
@@ -213,6 +213,16 @@ function toReview(r: ApiFinding["review"]): Review {
   return { status: r.status, note: r.note || undefined, updated_at: r.updated_at };
 }
 
+function reviewSummary(findings: ApiFinding[]): string {
+  const done = findings.filter((f) => f.review.status !== "unreviewed");
+  if (!done.length) return "";
+  const parts = (["confirmed", "needs_clarification", "rejected"] as const)
+    .map((st) => [st, done.filter((f) => f.review.status === st).length] as const)
+    .filter(([, n]) => n > 0)
+    .map(([st, n]) => `${REVIEW_STATUS[st].label.toLowerCase()} — ${n}`);
+  return ` Проверено человеком: ${done.length} из ${findings.length} (${parts.join(", ")}).`;
+}
+
 export function toAnalysisResult(b: LiveBundle): AnalysisResult {
   const { analysis, run } = b;
   const docs = analysis.documents;
@@ -360,6 +370,10 @@ export function toAnalysisResult(b: LiveBundle): AnalysisResult {
   }
 
   // Conclusion: built from the same saved findings, so the screen and the export never disagree.
+  // Human review shapes it (scenario H): rejected findings leave the main sections, questions get their own.
+  const isRejected = (r?: Review) => r?.status === "rejected";
+  const withReview = (text: string, r?: Review) =>
+    r?.status === "confirmed" ? `${text} — подтверждено проверяющим${r.note ? `: ${r.note}` : ""}.` : text;
   const sections: ConclusionSection[] = [];
   const counts = new Map<FunctionStatus, number>();
   functions.forEach((f) => counts.set(f.status, (counts.get(f.status) ?? 0) + 1));
@@ -373,7 +387,8 @@ export function toAnalysisResult(b: LiveBundle): AnalysisResult {
         text:
           `Проанализировано функций «До»: ${run.coverage.before_functions}, «После»: ${run.coverage.after_functions}. ` +
           (countText ? `Результат по функциям: ${countText}. ` : "") +
-          `Вопросов для проверки: ${risks.length}.`,
+          `Вопросов для проверки: ${risks.length}.` +
+          reviewSummary(b.findings),
         refs: [],
       },
     ],
@@ -381,22 +396,36 @@ export function toAnalysisResult(b: LiveBundle): AnalysisResult {
   const refsOf = (f: FunctionMapping) => [...(f.before ? [f.before.ref] : []), ...(f.after ?? []).map((a) => a.ref)];
   const group = (title: string, statuses: FunctionStatus[]) => {
     const items = functions
-      .filter((f) => statuses.includes(f.status))
-      .map((f) => ({ text: [f.title, f.note].filter(Boolean).join(". "), refs: refsOf(f) }));
+      .filter((f) => statuses.includes(f.status) && !isRejected(f.review))
+      .map((f) => ({ text: withReview([f.title, f.note].filter(Boolean).join(". "), f.review), refs: refsOf(f) }));
     if (items.length) sections.push({ title, items });
   };
   group("Функции без найденного соответствия", ["missing"]);
   group("Переданные, разделённые и объединённые функции", ["transferred", "split", "merged"]);
   group("Новые функции", ["new"]);
-  if (risks.length) {
+  const riskRefs = (r: Risk) => (r.a.ref.clause_id === r.b.ref.clause_id ? [r.a.ref] : [r.a.ref, r.b.ref]);
+  const openRisks = risks.filter((r) => !isRejected(r.review));
+  if (openRisks.length) {
     sections.push({
       title: "Вопросы для проверки",
-      items: risks.map((r) => ({
-        text: `${RISK_KIND[r.kind].label}: ${r.title}. ${r.check}`.trim(),
-        refs: r.a.ref.clause_id === r.b.ref.clause_id ? [r.a.ref] : [r.a.ref, r.b.ref],
+      items: openRisks.map((r) => ({
+        text: withReview(`${RISK_KIND[r.kind].label}: ${r.title}. ${r.check}`.trim(), r.review),
+        refs: riskRefs(r),
       })),
     });
   }
+  // One entry per finding even when it is both a function row and a risk card.
+  const byFinding = new Map<string, { title: string; review?: Review; refs: ClauseRef[] }>();
+  functions.forEach((f) => byFinding.set(f.id, { title: f.title, review: f.review, refs: refsOf(f) }));
+  risks.forEach((r) => byFinding.has(r.id) || byFinding.set(r.id, { title: r.title, review: r.review, refs: riskRefs(r) }));
+  const reviewed = (status: "needs_clarification" | "rejected", title: string, noteLabel: string) => {
+    const items = [...byFinding.values()]
+      .filter((x) => x.review?.status === status)
+      .map((x) => ({ text: x.review?.note ? `${x.title}. ${noteLabel}: ${x.review.note}` : x.title, refs: x.refs }));
+    if (items.length) sections.push({ title, items });
+  };
+  reviewed("needs_clarification", "Вопросы без окончательной проверки", "Заметка проверяющего");
+  reviewed("rejected", "Отклонено при проверке", "Причина");
   const structureItems = [
     ...units
       .filter((u) => u.status !== "kept")

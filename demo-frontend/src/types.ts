@@ -172,6 +172,9 @@ export interface EvidenceRequest {
   after?: ClauseRef[];
   /** Extra context under the title, e.g. how completely the After set was searched. */
   note?: string;
+  /** Live results: the finding behind this row/card, so the drawer can record a human review. */
+  finding_id?: string;
+  review?: Review;
 }
 
 // ---------------------------------------------------------------------------------------------

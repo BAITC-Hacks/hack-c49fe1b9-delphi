@@ -5,14 +5,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ClauseFragment } from "@/components/ClauseFragment";
 import { EmptyState } from "@/components/EmptyState";
+import { ReviewControls } from "@/components/ReviewControls";
 import { StatusChip } from "@/components/StatusChip";
 import { citeRef } from "@/lib/format";
-import type { ClauseRef, EvidenceRequest } from "@/types";
+import type { ClauseRef, EvidenceRequest, ReviewStatus } from "@/types";
 
 interface Props {
   request: EvidenceRequest | null;
   analysisId: string;
   onClose(): void;
+  /** Live results only: saves a human review of the finding shown in the drawer. */
+  onReview?(findingId: string, status: ReviewStatus, note: string): Promise<void>;
 }
 
 function copyCite(ref: ClauseRef) {
@@ -62,7 +65,7 @@ function Column({ label, refs, analysisId }: { label: "До" | "После"; ref
 }
 
 /** Side-by-side source fragments. Everything shown here is verbatim document text (DESIGN.md §4.5). */
-export function EvidenceDrawer({ request, analysisId, onClose }: Props) {
+export function EvidenceDrawer({ request, analysisId, onClose, onReview }: Props) {
   return (
     <Sheet open={!!request} onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-[720px]">
@@ -82,6 +85,9 @@ export function EvidenceDrawer({ request, analysisId, onClose }: Props) {
                 <Column label="После" refs={request.after ?? []} analysisId={analysisId} />
               </div>
             </ScrollArea>
+            {onReview && request.finding_id && (
+              <ReviewControls findingId={request.finding_id} review={request.review} onSave={onReview} />
+            )}
           </>
         )}
       </SheetContent>

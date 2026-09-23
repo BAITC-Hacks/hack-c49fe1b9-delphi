@@ -15,16 +15,23 @@ import { StatusChip } from "@/components/StatusChip";
 import { TracePanel } from "@/components/TracePanel";
 import { UnitTable } from "@/components/UnitTable";
 import { useAnalysis } from "@/hooks/useAnalysis";
-import { DEMO_ID } from "@/lib/api";
+import { DEMO_ID, saveReview } from "@/lib/api";
 import { plural } from "@/lib/adapter";
 import { UNIT_STATUS } from "@/lib/status";
-import type { EvidenceRequest, UnitStatus } from "@/types";
+import type { EvidenceRequest, ReviewStatus, UnitStatus } from "@/types";
 
 export default function AnalysisPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data, error, loading, reload } = useAnalysis(id);
+  const { data, error, loading, reload, replace } = useAnalysis(id);
   const [evidence, setEvidence] = useState<EvidenceRequest | null>(null);
+
+  /** Scenario H: stored on the server; the page is rebuilt from the saved bundle, not refetched. */
+  const onReview = async (findingId: string, status: ReviewStatus, note: string) => {
+    if (!id) return;
+    const next = await saveReview(id, findingId, status, note);
+    if (next) replace(next);
+  };
 
   const unitCounts = useMemo(() => {
     const counts: Partial<Record<UnitStatus, number>> = {};
@@ -164,7 +171,12 @@ export default function AnalysisPage() {
         <TracePanel trace={data.trace} />
       </div>
 
-      <EvidenceDrawer request={evidence} analysisId={id ?? DEMO_ID} onClose={() => setEvidence(null)} />
+      <EvidenceDrawer
+        request={evidence}
+        analysisId={id ?? DEMO_ID}
+        onClose={() => setEvidence(null)}
+        onReview={data.live ? onReview : undefined}
+      />
     </AppShell>
   );
 }

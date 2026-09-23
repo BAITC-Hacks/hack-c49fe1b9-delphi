@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EmptyState } from "@/components/EmptyState";
 import { RefButton } from "@/components/RefButton";
+import { ReviewChip } from "@/components/ReviewControls";
 import { StatusChip } from "@/components/StatusChip";
 import { confidenceHint, percent } from "@/lib/format";
 import { FUNCTION_SORT, FUNCTION_STATUS } from "@/lib/status";
@@ -62,6 +63,9 @@ export function FunctionMapTable({ functions, onEvidence }: Props) {
         return hay.includes(q);
       })
       .sort((a, b) => {
+        // rejected by the reviewer: kept visible, but below everything that still needs attention
+        const r = Number(a.review?.status === "rejected") - Number(b.review?.status === "rejected");
+        if (r !== 0) return r;
         const d = FUNCTION_SORT.indexOf(a.status) - FUNCTION_SORT.indexOf(b.status);
         return d !== 0 ? d : (b.confidence ?? 0) - (a.confidence ?? 0);
       });
@@ -83,6 +87,8 @@ export function FunctionMapTable({ functions, onEvidence }: Props) {
       before: f.before ? [f.before.ref] : [],
       after: (f.after ?? []).map((a) => a.ref),
       note: f.search,
+      finding_id: f.id,
+      review: f.review,
     });
 
   return (
@@ -157,7 +163,7 @@ export function FunctionMapTable({ functions, onEvidence }: Props) {
                 {rows.map((f, i) => (
                   <TableRow
                     key={f.id}
-                    className="animate-in fade-in slide-in-from-bottom-1 duration-150"
+                    className={cn("animate-in fade-in slide-in-from-bottom-1 duration-150", f.review?.status === "rejected" && "opacity-60")}
                     style={{ animationDelay: `${Math.min(i, 12) * 20}ms`, animationFillMode: "both" }}
                   >
                     <TableCell className="align-top">
@@ -183,7 +189,10 @@ export function FunctionMapTable({ functions, onEvidence }: Props) {
                       )}
                     </TableCell>
                     <TableCell className="align-top">
-                      <StatusChip status={f.status} />
+                      <div className="flex flex-col items-start gap-1">
+                        <StatusChip status={f.status} />
+                        <ReviewChip review={f.review} />
+                      </div>
                     </TableCell>
                     <TableCell className="align-top">
                       {f.confidence != null ? <Confidence value={f.confidence} /> : <span className="text-muted-foreground">—</span>}
@@ -202,10 +211,13 @@ export function FunctionMapTable({ functions, onEvidence }: Props) {
           {/* Mobile cards */}
           <ul className="flex flex-col gap-2 md:hidden">
             {rows.map((f) => (
-              <li key={f.id} className="rounded-lg border bg-card p-3">
+              <li key={f.id} className={cn("rounded-lg border bg-card p-3", f.review?.status === "rejected" && "opacity-60")}>
                 <div className="flex items-start justify-between gap-2">
                   <p className="font-medium">{f.title}</p>
-                  <StatusChip status={f.status} />
+                  <div className="flex flex-col items-end gap-1">
+                    <StatusChip status={f.status} />
+                    <ReviewChip review={f.review} />
+                  </div>
                 </div>
                 {f.before && (
                   <p className="mt-1 text-xs text-muted-foreground">

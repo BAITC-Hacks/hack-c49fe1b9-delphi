@@ -182,6 +182,8 @@ export async function repeatRun(analysisId: string, allowPartial: boolean): Prom
 
 /** Verbatim blocks of the live result, filled by getAnalysis; the evidence drawer reads from here first. */
 const liveClauses = new Map<string, Clause>();
+/** Last loaded bundle per analysis: a saved review re-derives the result without refetching. */
+const liveBundles = new Map<string, LiveBundle>();
 
 /** Runs `fn` over `items` with at most `limit` requests in flight. */
 async function mapLimited<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -235,7 +237,9 @@ export async function getAnalysis(analysisId: string): Promise<AnalysisResult> {
     if (!res.ok) throw new ApiError(res.status, "Не удалось загрузить пример");
     return (await res.json()) as AnalysisResult;
   }
-  return toAnalysisResult(await loadLiveBundle(analysisId));
+  const bundle = await loadLiveBundle(analysisId);
+  liveBundles.set(analysisId, bundle);
+  return toAnalysisResult(bundle);
 }
 
 let demoClauses: Promise<Record<string, Clause>> | null = null;
@@ -267,6 +271,19 @@ export async function getClause(analysisId: string, documentId: string, clauseId
 
 export function updateReview(findingId: string, status: ReviewStatus, note: string) {
   return request<ApiReviewUpdated>(`/api/findings/${id(findingId)}/review`, json("PUT", { status, note }));
+}
+
+/** Saves a review and returns the result rebuilt from the same bundle (conclusion and export follow it). */
+export async function saveReview(analysisId: string, findingId: string, status: ReviewStatus, note: string) {
+  const saved = await updateReview(findingId, status, note);
+  const bundle = liveBundles.get(analysisId);
+  if (!bundle) return undefined;
+  const findings = bundle.findings.map((f) =>
+    f.id === findingId ? { ...f, review: { finding_id: f.id, status: saved.status, note: saved.note, updated_at: saved.updated_at } } : f,
+  );
+  const next: LiveBundle = { ...bundle, findings, run: { ...bundle.run, review_revision: saved.review_revision } };
+  liveBundles.set(analysisId, next);
+  return toAnalysisResult(next);
 }
 
 export function reportUrl(runId: string, lang: "ru" | "kk" | "en" = "ru") {

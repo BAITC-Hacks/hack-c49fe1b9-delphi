@@ -12,9 +12,10 @@ import {
   Scaling,
   SearchX,
   ToggleLeft,
+  X,
   type LucideIcon,
 } from "lucide-react";
-import type { FunctionStatus, RiskKind, UnitStatus } from "@/types";
+import type { FunctionStatus, ReviewStatus, RiskKind, UnitStatus } from "@/types";
 
 export interface StatusMeta {
   label: string;
@@ -70,6 +71,14 @@ export const RISK_KIND: Record<RiskKind, StatusMeta> = {
   modality: { label: "Изменена обязательность", icon: ToggleLeft, className: tone.reworded },
   scope: { label: "Изменена область действия", icon: Scaling, className: tone.reworded },
   unclear: { label: "Неясность", icon: CircleHelp, className: tone.missing },
+};
+
+/** Human review (product.md §3.5). Separate from the AI status: it never changes the finding itself. */
+export const REVIEW_STATUS: Record<ReviewStatus, StatusMeta> = {
+  unreviewed: { label: "Не проверено", icon: CircleHelp, className: "border-border bg-card text-muted-foreground" },
+  confirmed: { label: "Подтверждено", icon: Check, className: tone.new },
+  needs_clarification: { label: "Нужно уточнение", icon: CircleHelp, className: tone.missing },
+  rejected: { label: "Отклонено", icon: X, className: "border-border bg-muted text-muted-foreground" },
 };
 
 /** Default order in the function table: what a human must check first goes on top. */
