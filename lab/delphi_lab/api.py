@@ -14,7 +14,7 @@ from .models import Locale, Side
 from .pipeline import execute_run, upload_bytes, translate_saved
 from .reports import render_report, functions_csv
 from .runtime import RuntimeLock
-from .storage import Store
+from .storage import Store, now
 from .validation import materialize_evidence
 
 
@@ -89,7 +89,8 @@ def schedule_run(store: Store, run_id: str, settings: Settings, *, resume: bool 
             saved = store.run(run_id)
             saved['errors'].append(f'Scheduled execution stopped ({type(exc).__name__}); saved results retained.')
             if saved['state'] in {'running', 'queued'}:
-                saved.update(state='partial' if saved.get('functions') else 'failed', stage='stopped')
+                saved.update(state='partial' if saved.get('functions') else 'failed',
+                             stage='stopped', finished_at=now())
             store.save_run(saved)
     task = asyncio.create_task(execute(), name=run_id)
     app.state.tasks.add(task)
@@ -146,6 +147,10 @@ async def start(analysis_id: str, payload: RunInput):
     if payload.mode == 'live':
         require_live_config(settings.model)
     existing = store.analysis(analysis_id)['run']
+    # Resume is registered before its thread changes the saved state. Consult
+    # scheduled tasks as well as Store.start's transactional active-run check.
+    if existing is None and any(not task.done() for task in app.state.tasks):
+        raise ValueError('Another lab run is active.')
     run = store.start(analysis_id, payload.mode, payload.language, settings.model, payload.allow_limited)
     if existing is None:
         schedule_run(store, run['id'], settings)

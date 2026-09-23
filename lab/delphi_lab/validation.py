@@ -120,8 +120,12 @@ def validate_result(result: AgentResult, documents: list[Document]) -> None:
             raw_ids = {b.id for b in sources.values() if b.side == search.side and b.kind != 'toc'}
             if not set(search.reviewed_source_ids) <= raw_ids or not set(search.candidate_source_ids) <= raw_ids:
                 raise ValueError('Search contains unknown or wrong-side source IDs')
+            if not set(search.candidate_source_ids) <= set(search.reviewed_source_ids):
+                raise ValueError('Search candidate was not reviewed')
             if search.complete and (set(search.reviewed_source_ids) != raw_ids or search.errors):
                 raise ValueError('Complete search must cover all raw source blocks without gaps')
+            if search.complete and any(document.parse_status != 'ok' for document in documents):
+                raise ValueError('Complete search cannot hide parsing gaps')
         if finding.change_type in {'unmatched', 'added'}:
             opposite = 'after' if finding.change_type == 'unmatched' else 'before'
             # Old saved partial runs remain readable. New absence claims must

@@ -1,6 +1,8 @@
 """Local database/API/report acceptance with fake agents and no external network."""
 from contextlib import ExitStack
 from copy import deepcopy
+import asyncio
+from dataclasses import replace
 import json
 import os
 from pathlib import Path
@@ -197,6 +199,83 @@ class WorkflowTests(unittest.TestCase):
             self.assertIn('Synthetic acceptance', client.get(f'/api/runs/{run_id}/report').text)
             self.assertEqual(client.get(f'/api/runs/{run_id}/functions.csv').status_code, 200)
             self.assertEqual(client.get(f'/api/runs/{run_id}/costs').status_code, 200)
+
+    def test_real_agent_resume_translation_and_report_with_scripted_sdk(self):
+        from test_agent_semantics import AgentSemanticsTests, CallbackClient
+        run = self.new_run()
+        first_client = CallbackClient(AgentSemanticsTests.normal_reply)
+        with patch('openai.OpenAI', return_value=first_client):
+            stopped = pipeline.execute_run(self.store, run['id'], replace(self.settings, max_calls=2))
+        self.assertEqual(stopped['state'], 'partial')
+        self.assertEqual(len(stopped['functions']), 2)
+        accepted_functions = deepcopy(stopped['functions'])
+        second_client = CallbackClient(AgentSemanticsTests.normal_reply)
+        with patch('openai.OpenAI', return_value=second_client):
+            completed = pipeline.execute_run(self.store, run['id'], self.settings, resume=True)
+        self.assertEqual(completed['state'], 'completed', completed['errors'])
+        self.assertEqual(completed['functions'], accepted_functions)
+        self.assertEqual(completed['usage']['api_calls'], 5)
+        self.assertNotIn('_Extraction', [r['text']['format']['name'] for r in second_client.requests])
+        finding_id = completed['findings'][0]['id']
+        self.assertTrue(finding_id.startswith(run['id'] + '__'))
+        self.assertNotIn('__' + run['id'], finding_id)
+        self.store.review(run['id'], finding_id, 'confirmed', '  Original review\nremains unchanged  ')
+
+        def translation_reply(schema, payload, call):
+            key = 'findings' if schema == '_Translation' else 'structure'
+            self.assertNotIn('Original review', json.dumps(payload))
+            return {key: [{name: value if name == 'id' else 'EN ' + value for name, value in item.items()}
+                          for item in payload[key]]}
+        client = CallbackClient(translation_reply)
+        with patch('openai.OpenAI', return_value=client):
+            translated = pipeline.translate_saved(self.store, run['id'], 'en', self.settings)
+            self.assertEqual(pipeline.translate_saved(self.store, run['id'], 'en', self.settings), translated)
+        self.assertEqual(len(client.requests), 2)
+        html = render_report(self.store, run['id'], 'en')
+        self.assertIn('EN Synthetic change', html)
+        self.assertIn('Original review\nremains unchanged', html)
+        self.assertEqual(self.store.run(run['id'])['functions'], accepted_functions)
+
+    def test_scheduled_resume_blocks_second_resume_and_new_start(self):
+        run = self.new_run()
+        run.update(state='partial', stage='finished')
+        self.store.save_run(run)
+        other = self.store.create_analysis('Another synthetic analysis')
+
+        async def scenario():
+            with patch.object(api.app.state, 'store', self.store, create=True), \
+                    patch.object(api.app.state, 'settings', self.settings, create=True), \
+                    patch.object(api.app.state, 'tasks', set(), create=True), \
+                    patch.object(api, 'execute_run') as execute:
+                accepted = await api.resume(run['id'], api.ResumeInput())
+                self.assertEqual(accepted['state'], 'queued')
+                self.assertTrue(api.scheduled(run['id']))
+                with self.assertRaisesRegex(ValueError, 'active'):
+                    await api.resume(run['id'], api.ResumeInput())
+                with self.assertRaisesRegex(ValueError, 'active'):
+                    await api.start(other['id'], api.RunInput())
+                with self.assertRaisesRegex(ValueError, 'scheduled'):
+                    api.translate(run['id'], api.TranslationInput(language='en'))
+                await asyncio.gather(*list(api.app.state.tasks))
+                execute.assert_called_once()
+                self.assertFalse(api.scheduled(run['id']))
+        asyncio.run(scenario())
+        self.assertIsNone(self.store.analysis(other['id'])['run'])
+
+    def test_background_preflight_failure_is_persisted_and_sanitized(self):
+        run = self.new_run()
+
+        async def scenario():
+            with patch.object(api.app.state, 'tasks', set(), create=True), \
+                    patch.object(api, 'execute_run', side_effect=RuntimeError('PRIVATE REQUEST BODY')):
+                api.schedule_run(self.store, run['id'], self.settings)
+                await asyncio.gather(*list(api.app.state.tasks))
+        asyncio.run(scenario())
+        saved = self.store.run(run['id'])
+        self.assertEqual(saved['state'], 'failed')
+        self.assertIsNotNone(saved['finished_at'])
+        self.assertIn('RuntimeError', saved['errors'][0])
+        self.assertNotIn('PRIVATE REQUEST BODY', json.dumps(saved))
 
 
 if __name__ == '__main__':

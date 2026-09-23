@@ -61,7 +61,7 @@
   "real_pair_manual_checklist": {
     "source_of_expectations": "docs/source-analysis.md",
     "before_input": "docs/sources/Положение_о_внутреннем_аудите_редакция_8_обезличено.docx",
-    "after_input": "docs/hackaton/tracks/Положение_о_внутреннем_аудите_редакция_9_обезличено.docx.md",
+    "after_input": "docs/sources/Положение_о_внутреннем_аудите_редакция_9_обезличено.docx",
     "cases": [
       {
         "id": "structure_3_4",

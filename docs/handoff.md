@@ -1,5 +1,7 @@
 # Handoff — состояние проекта Delphi на 15:50, 23.09.2026
 
+> Исторический handoff UI. Текущий статус основного приложения — в [README](README.md) и [плане](implementation-plan.md); завершённая offline-работа над lab — в [lab handoff](../lab/docs/handoff.md). Старые указания ниже не являются разрешением запускать live или менять scope текущей задачи. Lab прошёл 106 offline-тестов и preprocess DOCX 8/9; перенос lab-логики в основной backend отдельно не выполнен.
+
 Для нового чата (Opus 5.5). Порядок чтения: этот файл целиком → `backend/openapi.json` (истина по API) → `demo-frontend/README.md` → `docs/product.md` → `docs/design/SCENARIOS.md`. Дедлайн 18:00, фриз фич 17:00. Часы репозитория и `date` совпадают; ориентируйся на `date`.
 
 **Ветка фронта:** `nurdaulet-design-features-update` → PR #1 в `main` (https://github.com/BAITC-Hacks/hack-c49fe1b9-delphi/pull/1). Ветка создана поверх коммитов бэкенда `0dc0689` и `56b6c5b`, конфликтов с `main` нет.

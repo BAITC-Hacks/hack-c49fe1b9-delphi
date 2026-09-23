@@ -168,7 +168,7 @@ _TOOLS = [
     _tool("get_unit_functions", "Read extracted functions of a known unit on the specified side.", {
         "side": _SIDE, "unit_id": _STRING, "offset": {"type": "integer", "minimum": 0}}),
     _tool("check_references", "Locate numbered internal reference targets; no semantic/legal verdict.", {
-        "document_id": _STRING}),
+        "document_id": _STRING, "offset": {"type": "integer", "minimum": 0}}),
 ]
 
 
@@ -270,6 +270,25 @@ class _Runner:
                                       "max_calls": max_calls, "timeout_seconds": timeout_seconds})
             self.result.errors = []
             self.result.complete = False
+            if any(b.kind != "toc" and b.id not in self.processed for b in self.blocks.values()):
+                # New extraction can change owners, hierarchy and the function
+                # catalog. Previously accepted extraction remains reusable;
+                # conclusions based on the old incomplete catalog do not.
+                self.result.trace.append({"operation": "invalidate_downstream_after_extraction_gap",
+                                          "findings": len(self.result.findings),
+                                          "structure": len(self.result.structure)})
+                self.result.findings = []
+                self.result.structure = []
+                self.compared.clear()
+                self.candidate_reviewed.clear()
+                self.risk_reviewed.clear()
+                self.source_sweeps.clear()
+                self.unmatched_sweeps.clear()
+                self.classified_after.clear()
+
+    def validate_update(self, **changes) -> None:
+        from .validation import validate_result
+        validate_result(self.result.model_copy(update={**changes, "complete": False}), self.documents)
 
     def checkpoint(self, stage: str) -> None:
         before = [f.id for f in self.result.functions if f.side == "before"]
@@ -317,8 +336,6 @@ class _Runner:
     def request(self, stage: str, payload: dict, schema: type[StrictModel], tools: bool = False):
         from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
 
-        if self.client is None:
-            self.client = OpenAI(max_retries=0)
         instructions = (_PROMPTS / "system.md").read_text(encoding="utf-8") + "\n" + (
             _PROMPTS / f"{stage}.md").read_text(encoding="utf-8")
         instructions += f"\nOutput explanation language: {_LOCALES[self.language]}."
@@ -327,6 +344,8 @@ class _Runner:
         # allowance and never silently discard earlier evidence.
         if len(_dump(payload)) > self.max_input_chars:
             raise ValueError(f"{stage}: batch exceeds max_input_chars; no text was truncated")
+        if self.client is None:
+            self.client = OpenAI(max_retries=0)
         for round_no in range(self.max_tool_rounds + 1):
             if len(_dump([x.model_dump(mode="json") if hasattr(x, "model_dump") else x
                           for x in conversation])) > self.max_input_chars * (self.max_tool_rounds + 2):
@@ -437,7 +456,7 @@ class _Runner:
         started = time.monotonic()
         expected = {"search_clauses": {"side", "query", "filters", "offset"},
                     "get_clause": {"source_id"}, "get_unit_functions": {"side", "unit_id", "offset"},
-                    "check_references": {"document_id"}}
+                    "check_references": {"document_id", "offset"}}
         if name not in expected or not isinstance(args, dict):
             raise ValueError("Unknown tool or invalid arguments")
         # offset defaults preserve old saved calls and direct helper callers.
@@ -454,6 +473,8 @@ class _Runner:
             if not isinstance(filters, dict) or set(filters) - {"document_id", "clause_prefix"}:
                 raise ValueError("Unknown search filter")
             doc_id, prefix = filters.get("document_id"), filters.get("clause_prefix")
+            if any(value is not None and not isinstance(value, str) for value in (doc_id, prefix)):
+                raise ValueError("Search filters must be strings or null")
             if doc_id and not any(d.id == doc_id and d.side == side for d in self.documents):
                 raise ValueError("Search document is unknown or on the wrong side")
             corpus = [b for b in self.blocks.values() if b.side == side
@@ -510,16 +531,30 @@ class _Runner:
                 raise ValueError("Unknown document ID")
             targets: dict[str, list[str]] = {}
             for block in doc.blocks:
+                if block.kind == "toc":
+                    continue
                 if block.clause_no:
                     targets.setdefault(block.clause_no.rstrip("."), []).append(block.id)
             references = []
             for block in doc.blocks:
+                if block.kind == "toc":
+                    continue
                 for match in re.finditer(r"(?i)(?:пункт\w*|пп?\.|clauses?|sections?|тармақ\w*)\s*(\d+(?:\.\d+)+)", block.original_text):
                     number = match.group(1).rstrip(".")
                     references.append({"source_id": block.id, "reference": number,
                                        "target_ids": targets.get(number, [])})
-            output = {"references": references[:60], "total": len(references),
-                      "truncated": len(references) > 60, "semantic_check": "not performed by this tool"}
+            selected = []
+            for reference in references[offset:offset + 60]:
+                if len(_dump(selected + [reference])) > self.max_input_chars:
+                    if not selected:
+                        raise ValueError("Reference exceeds tool output budget")
+                    break
+                selected.append(reference)
+            next_offset = offset + len(selected)
+            output = {"references": selected, "total": len(references), "offset": offset,
+                      "has_more": next_offset < len(references),
+                      "next_offset": next_offset if next_offset < len(references) else None,
+                      "truncated": next_offset < len(references), "semantic_check": "not performed by this tool"}
         else:
             raise ValueError(f"Unknown tool: {name}")
         ids = []
@@ -576,15 +611,29 @@ class _Runner:
                 self.check_budget()
                 try:
                     parsed = self.request("extract", payload, _Extraction)
-                    if set(parsed.processed_source_ids) != primary_ids:
+                    if (len(parsed.processed_source_ids) != len(primary_ids)
+                            or set(parsed.processed_source_ids) != primary_ids):
                         raise ValueError("Extraction did not acknowledge exactly all primary source IDs")
                     local_units: dict[str, str] = {}
                     accepted_units = []
+                    originals = {unit.id: unit for unit in parsed.units}
+                    if len(originals) != len(parsed.units):
+                        raise ValueError("Duplicate local unit ID")
+
+                    def unit_identity(identifier: str, visiting: set[str]) -> str:
+                        if identifier in visiting or identifier not in originals:
+                            raise ValueError("Unit parent is unknown or cyclic")
+                        unit = originals[identifier]
+                        parts = [doc.side, unit.kind, _norm(unit.name_original)]
+                        if unit.parent_unit_id is not None:
+                            parts.append(unit_identity(unit.parent_unit_id, visiting | {identifier}))
+                        return _id("u_", *parts)
+
                     for unit in parsed.units:
                         self.validate_sources(unit.source_ids, doc.side, allowed)
-                        if unit.side != doc.side or unit.id in local_units or not unit.name_original.strip():
+                        if unit.side != doc.side or not unit.id.strip() or not unit.name_original.strip():
                             raise ValueError("Unit side or duplicate local unit ID is invalid")
-                        stable = _id("u_", doc.side, unit.kind, _norm(unit.name_original))
+                        stable = unit_identity(unit.id, set())
                         local_units[unit.id] = stable
                         accepted_units.append(unit.model_copy(update={"id": stable}))
                     for original, accepted in zip(parsed.units, accepted_units):
@@ -593,11 +642,16 @@ class _Runner:
                             raise ValueError("Unit parent is unknown or refers to itself")
                         accepted.parent_unit_id = local_units[parent] if parent is not None else None
                     accepted_functions = []
+                    local_function_ids = set()
                     for function in parsed.functions:
+                        if not function.id.strip() or function.id in local_function_ids:
+                            raise ValueError("Empty or duplicate local function ID")
+                        local_function_ids.add(function.id)
                         self.validate_sources(function.source_ids, doc.side, allowed)
                         if function.side != doc.side or not primary_ids.intersection(function.source_ids) or not function.action.strip():
                             raise ValueError("Function side or primary evidence is invalid")
-                        if any(owner not in local_units for owner in function.owner_unit_ids):
+                        if (len(set(function.owner_unit_ids)) != len(function.owner_unit_ids)
+                                or any(owner not in local_units for owner in function.owner_unit_ids)):
                             raise ValueError("Function refers to an unknown owner unit")
                         owners = sorted({local_units[owner] for owner in function.owner_unit_ids})
                         stable = _id("fn_", doc.side, sorted(function.source_ids), owners,
@@ -624,6 +678,7 @@ class _Runner:
                             current = units[current.parent_unit_id]
                     functions = {f.id: f for f in self.result.functions}
                     functions.update({f.id: f for f in accepted_functions})
+                    self.validate_update(units=list(units.values()), functions=list(functions.values()))
                     self.result.units, self.result.functions = list(units.values()), list(functions.values())
                     self.processed.update(primary_ids)
                 except _OutputLimit as exc:
@@ -642,11 +697,11 @@ class _Runner:
                 self.checkpoint("extract")
 
     def validate_sources(self, ids: list[str], side: str, allowed: set[str] | None = None) -> None:
-        if not ids:
+        if not ids or len(set(ids)) != len(ids):
             raise ValueError("Evidence source list is empty")
         for source_id in ids:
             block = self.blocks.get(source_id)
-            if block is None or block.side != side or (allowed is not None and source_id not in allowed):
+            if block is None or block.kind == "toc" or block.side != side or (allowed is not None and source_id not in allowed):
                 raise ValueError(f"Unknown, wrong-side or out-of-batch source ID: {source_id}")
 
     def validate_finding(self, finding: Finding, *, risk: bool = False) -> Finding:
@@ -707,6 +762,7 @@ class _Runner:
             raise ValueError("Finding is unrelated to the current target batch")
         current = {f.id: f for f in self.result.findings}
         current.update({f.id: f for f in valid})
+        self.validate_update(findings=list(current.values()))
         self.result.findings = list(current.values())
 
     def payload(self, targets: list[Function], candidates: list[Function], mode: str) -> dict:
@@ -749,9 +805,16 @@ class _Runner:
         groups: dict[tuple, dict[str, list[Unit]]] = {}
         all_units = {u.id: u for u in self.result.units}
         for unit in remaining:
-            parent = all_units.get(unit.parent_unit_id)
-            signature = (unit.kind, _norm(unit.name_original),
-                         None if parent is None else (parent.kind, _norm(parent.name_original)))
+            ancestors, visited = [], {unit.id}
+            parent_id = unit.parent_unit_id
+            while parent_id is not None:
+                if parent_id in visited or parent_id not in all_units:
+                    raise ValueError("Structure parent hierarchy is unknown or cyclic")
+                visited.add(parent_id)
+                parent = all_units[parent_id]
+                ancestors.append((parent.kind, _norm(parent.name_original)))
+                parent_id = parent.parent_unit_id
+            signature = (unit.kind, _norm(unit.name_original), tuple(ancestors))
             groups.setdefault(signature, {"before": [], "after": []})[unit.side].append(unit)
         explanation = {
             "ru": "Наименование, тип и указанный родитель совпадают. Это не означает неизменность обязанностей.",
@@ -797,6 +860,7 @@ class _Runner:
                 staged.append(row.model_copy(update={"id": _id("s_", row.status, sorted(ids))}))
             if seen != expected:
                 raise ValueError("Structure did not cover every remaining unit")
+            self.validate_update(structure=self.result.structure + staged)
             self.result.structure.extend(staged)
         except (ValueError, ValidationError) as exc:
             self.result.errors.append(f"Structure: {exc}")
@@ -828,6 +892,7 @@ class _Runner:
                 expected = {item["id"] for item in batch}
                 if (len(result.reviewed_source_ids) != len(set(result.reviewed_source_ids))
                         or set(result.reviewed_source_ids) != expected
+                        or len(result.candidate_source_ids) != len(set(result.candidate_source_ids))
                         or not set(result.candidate_source_ids) <= expected):
                     raise ValueError("Semantic source search has unknown or unreviewed IDs")
                 reviewed.update(expected)
@@ -857,7 +922,10 @@ class _Runner:
             candidates = self.candidates(targets, after, "candidates")
             try:
                 parsed = self.request("compare", self.payload(targets, candidates, "candidates"), _Comparison, tools=True)
-                if set(parsed.reviewed_function_ids) != target_ids or set(parsed.unmatched_function_ids) - target_ids:
+                if (len(parsed.reviewed_function_ids) != len(target_ids)
+                        or set(parsed.reviewed_function_ids) != target_ids
+                        or len(parsed.unmatched_function_ids) != len(set(parsed.unmatched_function_ids))
+                        or set(parsed.unmatched_function_ids) - target_ids):
                     raise ValueError("Comparison coverage IDs do not match target IDs")
                 mapped_ids = {fid for finding in parsed.findings for fid in finding.before_function_ids}
                 if (target_ids - mapped_ids != set(parsed.unmatched_function_ids)
@@ -964,7 +1032,7 @@ class _Runner:
             candidates = self.candidates(targets, after, "after_risks")
             try:
                 parsed = self.request("risks", self.payload(targets, candidates, "after_risks"), _Risks, tools=True)
-                if set(parsed.reviewed_function_ids) != target_ids:
+                if len(parsed.reviewed_function_ids) != len(target_ids) or set(parsed.reviewed_function_ids) != target_ids:
                     raise ValueError("Risk coverage IDs do not match target IDs")
                 self.accept_findings(parsed.findings, risk=True, target_ids=target_ids)
                 self.risk_reviewed.update(target_ids)
@@ -1015,9 +1083,13 @@ def run_agent(documents: list[Document], *, model: str, language: str = "ru",
                                   and structure_units == reviewed_units
                                   and after <= mapped_after | runner.classified_after
                                   and all(d.parse_status == "ok" for d in documents))
+        from .validation import validate_result
+        validate_result(runner.result, documents)
     except (_Stopped, ValueError, ValidationError) as exc:
+        runner.result.complete = False
         runner.result.errors.append(str(exc))
     except Exception as exc:
+        runner.result.complete = False
         # SDK/configuration exceptions must not leak keys or raw request bodies.
         runner.result.errors.append(f"Agent stopped: {type(exc).__name__}. Accepted partial results retained.")
     finally:
@@ -1039,6 +1111,7 @@ def translate_result(result: AgentResult, locale: str, model: str, *, run_id: st
         raise ValueError("OPENAI_API_KEY is not configured")
     runner = _Runner([], model, locale, 40, 5000, 16000, 0, 600, None, run_id=run_id)
     translated = []
+    translated_structure = []
     try:
         items = [{"id": f.id, "title": f.title, "explanation": f.explanation,
                   "recommendation": f.recommendation} for f in result.findings]
@@ -1049,10 +1122,18 @@ def translate_result(result: AgentResult, locale: str, model: str, *, run_id: st
             if len(actual) != len(expected) or set(actual) != expected:
                 raise ValueError("Translation changed the finding ID set")
             translated.extend(item.model_dump() for item in parsed.findings)
+        items = [{"id": item.id, "explanation": item.explanation} for item in result.structure]
+        for batch in _batches(items, 12000, count=15):
+            parsed = runner.request("translation", {"locale": locale, "structure": batch}, _StructureTranslation)
+            expected = {item["id"] for item in batch}
+            actual = [item.id for item in parsed.structure]
+            if len(actual) != len(expected) or set(actual) != expected:
+                raise ValueError("Translation changed the structure ID set")
+            translated_structure.extend(item.model_dump() for item in parsed.structure)
         runner.result.usage.update(model=model, api_calls=runner.calls,
                                   elapsed_seconds=round(time.monotonic() - runner.started, 2))
         runner.result.usage['cost_tracking'] = runner.costs.snapshot()
-        return {"locale": locale, "findings": translated, "usage": runner.result.usage,
+        return {"locale": locale, "findings": translated, "structure": translated_structure, "usage": runner.result.usage,
                 "draft": locale == "kk"}
     finally:
         if runner.client is not None:

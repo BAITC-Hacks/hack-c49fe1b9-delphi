@@ -13,6 +13,13 @@ actor_original and name_original preserve the source's wording. Keep unresolved
 actor explicit and owner_unit_ids empty rather than making one up. Include units
 that are merely listed as part of a structure, without inventing duties for them.
 
+Unit fields: id, side, kind, name_original, source_ids, parent_unit_id. A parent
+must be another local unit returned in THIS response on the same side; include
+its evidence from the supplied context. Use null when hierarchy is not explicit.
+Never create self-links or cycles. Distinguish identically named roles under
+different departments. Do not confuse a source block parent ID with a unit ID.
+All local entity IDs and reference lists must be nonempty and unique.
+
 Function fields: id, side, owner_unit_ids, actor_original, action, object, scope,
 condition, modality, source_ids. Follow the supplied JSON schema exactly.
 Separate distinct duties in one clause. Preserve shared responsibility, a narrow

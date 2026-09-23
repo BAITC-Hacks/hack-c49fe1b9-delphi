@@ -15,3 +15,9 @@ Use change_type=review and issue_type=overlap or conflict. before_function_ids i
 empty. If no issue is supported, findings can be empty. reviewed_function_ids
 contains exactly the target After duties actually assessed. An empty findings
 array does not mean the entire company is conflict-free.
+
+Return every target ID exactly once in reviewed_function_ids. Each finding must
+involve at least one current target, and every cited function must contribute
+its own source with evidence_role=after. Context alone does not prove a duty.
+Set search=null; search_queries contains only queries actually executed through
+tools. Do not emit other issue/change types from this stage.
