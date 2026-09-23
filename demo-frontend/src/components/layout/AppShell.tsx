@@ -24,7 +24,7 @@ export function AppShell({ editions, mode, failedStage, showNew = true, children
               Контроль функций при реорганизации
             </span>
           </Link>
-          <Link to="/" className="hidden text-sm text-muted-foreground hover:text-foreground md:inline">
+          <Link to="/history" className="hidden text-sm text-muted-foreground hover:text-foreground md:inline">
             История
           </Link>
           <div className="ml-auto flex min-w-0 items-center gap-2 overflow-x-auto">
