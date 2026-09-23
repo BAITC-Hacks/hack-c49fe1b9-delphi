@@ -1,8 +1,11 @@
-import { AlertTriangle, ArrowRight, SearchX } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertTriangle, ArrowRight, GitCompareArrows, SearchX } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ClauseFragment } from "@/components/ClauseFragment";
 import { EmptyState } from "@/components/EmptyState";
 import { ReviewChip } from "@/components/ReviewControls";
 import { StatusChip } from "@/components/StatusChip";
+import { WordDiff } from "@/components/review/WordDiff";
 import type { QueueItem } from "@/hooks/useReviewQueue";
 import type { ClauseRef } from "@/types";
 
@@ -27,8 +30,14 @@ function Quotes({ label, refs, analysisId, empty }: { label: "До" | "Посл�
 }
 
 /** Right pane: what changed, who owned it before and after, and the verbatim clauses side by side. */
+/** Word diff is on by default where the wording itself is the finding. */
+const DIFF_BY_DEFAULT = new Set(["reworded", "modality", "scope"]);
+
 export function FindingDetail({ item, analysisId }: { item: QueueItem; analysisId: string }) {
   const bothAfter = item.kind === "risk" && item.after.length > 1;
+  const pair = item.before.length === 1 && item.after.length === 1 ? { before: item.before[0], after: item.after[0] } : null;
+  const [showDiff, setShowDiff] = useState(DIFF_BY_DEFAULT.has(item.status));
+  useEffect(() => setShowDiff(DIFF_BY_DEFAULT.has(item.status)), [item.id, item.status]);
   return (
     <article className="flex flex-col gap-5" aria-label={item.title}>
       <header className="flex flex-col gap-2">
@@ -109,6 +118,21 @@ export function FindingDetail({ item, analysisId }: { item: QueueItem; analysisI
             ))}
           </div>
         </section>
+      )}
+      {pair && (
+        <div className="flex flex-col gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-fit gap-1.5"
+            aria-pressed={showDiff}
+            onClick={() => setShowDiff((v) => !v)}
+          >
+            <GitCompareArrows className="size-4" aria-hidden="true" />
+            {showDiff ? "Скрыть различия слов" : "Показать различия слов"}
+          </Button>
+          {showDiff && <WordDiff before={pair.before} after={pair.after} analysisId={analysisId} />}
+        </div>
       )}
       <p className="text-xs text-muted-foreground">Цитаты приводятся дословно по исходным документам.</p>
     </article>
