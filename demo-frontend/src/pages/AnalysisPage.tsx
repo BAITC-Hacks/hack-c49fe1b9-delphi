@@ -86,7 +86,8 @@ export default function AnalysisPage() {
             <AlertTriangle className="size-4" aria-hidden="true" />
             <AlertTitle>Частичный результат</AlertTitle>
             <AlertDescription>
-              Стадия {data.partial.failed_stage} не завершена: {data.partial.message}. Показано то, что удалось посчитать.
+              {data.partial.failed_stage ? `Стадия ${data.partial.failed_stage} не завершена: ` : ""}
+              {data.partial.message}. Показано то, что удалось посчитать; подробности — в разделе «Ограничения» заключения.
             </AlertDescription>
           </Alert>
         )}

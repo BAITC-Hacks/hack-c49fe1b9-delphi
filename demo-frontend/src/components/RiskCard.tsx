@@ -10,13 +10,16 @@ interface Props {
 }
 
 export function RiskCard({ risk, onEvidence }: Props) {
+  // Live overlaps have both sides in «После»; without a side, a is «До» and b is «После» (demo).
+  const refs = risk.a.ref.clause_id === risk.b.ref.clause_id ? [risk.a.ref] : [risk.a.ref, risk.b.ref];
+  const sideOf = (i: number) => refs[i].side ?? (i === 0 ? "before" : "after");
   const open = () =>
     onEvidence({
       title: risk.title,
       kind: "risk",
       status: risk.kind,
-      before: [risk.a.ref],
-      after: [risk.b.ref],
+      before: refs.filter((_, i) => sideOf(i) === "before"),
+      after: refs.filter((_, i) => sideOf(i) === "after"),
     });
 
   return (

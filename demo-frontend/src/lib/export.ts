@@ -34,7 +34,7 @@ export function buildHtml(r: AnalysisResult): string {
       const after = (f.after ?? []).map((a) => `${esc(a.unit)} — ${esc(citeRef(a.ref))}`).join("<br/>") || "—";
       return `<tr><td>${esc(f.title)}</td><td>${f.before ? `${esc(f.before.unit)} — ${esc(citeRef(f.before.ref))}` : "—"}</td><td>${after}</td><td>${esc(
         FUNCTION_STATUS[f.status].label,
-      )}</td><td>${Math.round(f.confidence * 100)} %</td><td>${esc(f.note ?? "")}</td></tr>`;
+      )}</td><td>${f.confidence != null ? `${Math.round(f.confidence * 100)} %` : "—"}</td><td>${esc(f.note ?? "")}</td></tr>`;
     })
     .join("");
 
@@ -94,7 +94,7 @@ export function buildCsv(r: AnalysisResult): string {
       f.before ? citeRef(f.before.ref) : "",
       (f.after ?? []).map((a) => a.unit).join(" | "),
       (f.after ?? []).map((a) => citeRef(a.ref)).join(" | "),
-      String(Math.round(f.confidence * 100)),
+      f.confidence != null ? String(Math.round(f.confidence * 100)) : "",
       f.note ?? "",
     ]
       .map(q)

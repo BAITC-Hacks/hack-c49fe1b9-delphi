@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getRun, retryStage as apiRetryStage } from "@/lib/api";
+import { getRun, repeatRun } from "@/lib/api";
 import type { JobStatus } from "@/types";
 
 const POLL_MS = 2000; // architecture.md: UI polls about every two seconds
-const TIMEOUT_MS = 8 * 60 * 1000;
+const TIMEOUT_MS = 11 * 60 * 1000; // backend RUN_TIMEOUT_SECONDS is 600 s; allow a minute of slack
 
-/** Polls a run until it produces a result (JobStatus.result_id) or fails. */
+/** Polls a run until it produces a result (JobStatus.result_id), fails or is interrupted. */
 export function useJob(runId: string | undefined) {
   const [job, setJob] = useState<JobStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -16,6 +16,8 @@ export function useJob(runId: string | undefined) {
     if (!runId) return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    startedAt.current = Date.now();
+    setTimedOut(false);
 
     const tick = async () => {
       try {
@@ -23,7 +25,8 @@ export function useJob(runId: string | undefined) {
         if (stopped) return;
         setJob(next);
         setError(null);
-        if (next.result_id) return; // finished: caller navigates away
+        // finished (caller navigates away) or terminal failure: stop polling
+        if (next.result_id || next.stage_state === "failed" || next.stage_state === "interrupted") return;
       } catch (e) {
         if (stopped) return;
         setError(e instanceof Error ? e.message : "Не удалось получить статус");
@@ -42,16 +45,16 @@ export function useJob(runId: string | undefined) {
     };
   }, [runId]);
 
-  const retryStage = useCallback(async () => {
-    if (!runId) return;
+  /** Repeats the analysis with the same documents and options; resolves to the new run id. */
+  const retry = useCallback(async (): Promise<string | undefined> => {
+    if (!job?.analysis_id) return undefined;
     try {
-      const next = await apiRetryStage(runId);
-      setJob(next);
-      setError(null);
+      return await repeatRun(job.analysis_id, job.allow_partial ?? false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось перезапустить стадию");
+      setError(e instanceof Error ? e.message : "Не удалось повторить анализ");
+      return undefined;
     }
-  }, [runId]);
+  }, [job?.analysis_id, job?.allow_partial]);
 
-  return { job, error, timedOut, retryStage };
+  return { job, error, timedOut, retry };
 }

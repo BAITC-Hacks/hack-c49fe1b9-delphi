@@ -11,13 +11,20 @@ interface Props {
 }
 
 export function ConclusionReport({ result, onEvidence }: Props) {
+  const sideOf = (ref: ClauseRef) =>
+    ref.side ??
+    (ref.document_id === result.units.find((u) => u.before)?.before?.document_id
+      ? "before"
+      : ref.document_id === result.units.find((u) => u.after)?.after?.document_id
+        ? "after"
+        : undefined);
   const openRef = (text: string, ref: ClauseRef) =>
     onEvidence({
       title: text,
       kind: "function",
       status: "kept",
-      before: ref.document_id === result.units.find((u) => u.before)?.before?.document_id ? [ref] : [],
-      after: ref.document_id === result.units.find((u) => u.after)?.after?.document_id ? [ref] : [],
+      before: sideOf(ref) === "before" ? [ref] : [],
+      after: sideOf(ref) === "after" ? [ref] : [],
     });
 
   return (

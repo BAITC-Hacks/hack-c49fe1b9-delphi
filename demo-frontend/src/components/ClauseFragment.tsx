@@ -70,12 +70,14 @@ export function ClauseFragment({ ref_, analysisId }: Props) {
   const before = range ? clause.text.slice(0, range[0]) : clause.text;
   const mid = range ? clause.text.slice(range[0], range[1]) : "";
   const after = range ? clause.text.slice(range[1]) : "";
+  // Live source blocks already start with their number ("5.3.3. …"); the demo stores it separately.
+  const showNumber = !!clause.clause_number && !clause.text.trimStart().startsWith(clause.clause_number);
 
   return (
     <div className="flex flex-col gap-2">
       {clause.parent && <p className="text-xs text-muted-foreground">{clause.parent}</p>}
       <p className="whitespace-pre-line text-sm leading-relaxed">
-        <span className="mr-1 font-mono text-xs text-muted-foreground">{clause.clause_number}.</span>
+        {showNumber && <span className="mr-1 font-mono text-xs text-muted-foreground">{clause.clause_number}.</span>}
         {before}
         {mid && <mark className="rounded-sm bg-evidence-highlight px-0.5 text-foreground animate-evidence-pulse">{mid}</mark>}
         {after}

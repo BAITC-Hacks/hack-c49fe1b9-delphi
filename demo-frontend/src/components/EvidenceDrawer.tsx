@@ -74,6 +74,7 @@ export function EvidenceDrawer({ request, analysisId, onClose }: Props) {
               </div>
               <SheetTitle className="text-base leading-snug">{request.title}</SheetTitle>
               <SheetDescription>Фрагменты приводятся дословно по исходным документам.</SheetDescription>
+              {request.note && <p className="text-xs text-muted-foreground">{request.note}</p>}
             </SheetHeader>
             <ScrollArea className="flex-1">
               <div className="grid gap-4 p-5 md:grid-cols-2">

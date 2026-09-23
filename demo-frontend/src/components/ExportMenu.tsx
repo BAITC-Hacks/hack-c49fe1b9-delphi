@@ -1,6 +1,13 @@
-import { Download, FileSpreadsheet, FileText, Printer } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Printer, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { functionsCsvUrl, reportUrl } from "@/lib/api";
 import { buildCsv, buildHtml, download } from "@/lib/export";
 import type { AnalysisResult } from "@/types";
 
@@ -41,6 +48,23 @@ export function ExportMenu({ result }: { result: AnalysisResult }) {
           <FileSpreadsheet className="size-4" aria-hidden="true" />
           CSV функций
         </DropdownMenuItem>
+        {result.live && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <a href={reportUrl(result.live.run_id)} target="_blank" rel="noopener">
+                <Server className="size-4" aria-hidden="true" />
+                Отчёт сервера (HTML)
+              </a>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <a href={functionsCsvUrl(result.live.run_id)} download>
+                <Server className="size-4" aria-hidden="true" />
+                CSV сервера
+              </a>
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

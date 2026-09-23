@@ -63,7 +63,7 @@ export function FunctionMapTable({ functions, onEvidence }: Props) {
       })
       .sort((a, b) => {
         const d = FUNCTION_SORT.indexOf(a.status) - FUNCTION_SORT.indexOf(b.status);
-        return d !== 0 ? d : b.confidence - a.confidence;
+        return d !== 0 ? d : (b.confidence ?? 0) - (a.confidence ?? 0);
       });
   }, [functions, active, query]);
 
@@ -82,6 +82,7 @@ export function FunctionMapTable({ functions, onEvidence }: Props) {
       status: f.status,
       before: f.before ? [f.before.ref] : [],
       after: (f.after ?? []).map((a) => a.ref),
+      note: f.search,
     });
 
   return (
@@ -185,7 +186,7 @@ export function FunctionMapTable({ functions, onEvidence }: Props) {
                       <StatusChip status={f.status} />
                     </TableCell>
                     <TableCell className="align-top">
-                      <Confidence value={f.confidence} />
+                      {f.confidence != null ? <Confidence value={f.confidence} /> : <span className="text-muted-foreground">—</span>}
                     </TableCell>
                     <TableCell className="align-top">
                       <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => open(f)}>
@@ -219,7 +220,7 @@ export function FunctionMapTable({ functions, onEvidence }: Props) {
                 </p>
                 {f.note && <p className="mt-1 text-xs text-muted-foreground">{f.note}</p>}
                 <div className="mt-2 flex items-center justify-between gap-2">
-                  <Confidence value={f.confidence} />
+                  {f.confidence != null ? <Confidence value={f.confidence} /> : <span />}
                   <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => open(f)}>
                     Источник
                   </Button>
