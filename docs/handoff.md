@@ -1,8 +1,6 @@
 # Handoff — состояние проекта Delphi на 15:50, 23.09.2026
 
-Для нового чата (Opus 5.5). Порядок чтения: этот файл целиком → `backend/openapi.json` (истина по API) → `demo-frontend/README.md` → `docs/product.md` → `docs/design/SCENARIOS.md`. Дедлайн 18:00, фриз фич 17:00. Часы репозитория и `date` совпадают; ориентируйся на `date`.
-
-> **Статус на 16:20:** §3 выполнен в ветке `nurdaulet-api-integration` (адаптер `demo-frontend/src/lib/adapter.ts`, проверка человеком). Проверено на реальном бэкенде без ключа ИИ; живой прогон с моделью — первым делом, как только в `backend/.env` будет `OPENAI_API_KEY` + `OPENAI_MODEL`. Осталось Осману: `StaticFiles` для `demo-frontend/dist` (§2).
+Для нового чата (Opus 5.5). Порядок чтения: этот файл целиком → `backend/openapi.json` (истина по API) → `demo-frontend/README.md` → `docs/product.md` → `demo-frontend/docs/design/SCENARIOS.md`. Дедлайн 18:00, фриз фич 17:00. Часы репозитория и `date` совпадают; ориентируйся на `date`.
 
 **Ветка фронта:** `nurdaulet-design-features-update` → PR #1 в `main` (https://github.com/BAITC-Hacks/hack-c49fe1b9-delphi/pull/1). Ветка создана поверх коммитов бэкенда `0dc0689` и `56b6c5b`, конфликтов с `main` нет.
 
@@ -16,10 +14,10 @@
 | Синтетические контрольные пары | `backend/fixtures/synthetic/{missing,overlap,conflict,transfer,distinct-scope}` | Готовы, с `manifest.json` ожидаемых находок. Это то, что жюри будет проверять | Осман / Рауан |
 | Фронт | `demo-frontend/` | Все экраны готовы и проверены на офлайн-демо. **К реальному API не подключён** — контракт расходится, см. §3 | Нурдаулет |
 | Документация продукта | `docs/product.md`, `docs/architecture.md`, `docs/implementation-plan.md`, `docs/source-analysis.md` | Актуальна | команда |
-| Дизайн и сценарии | `docs/design/DESIGN.md`, `docs/design/SCENARIOS.md`, `docs/design/ASTRA-UI-PROMPTS.md` | Актуальны | Нурдаулет |
+| Дизайн и сценарии | `demo-frontend/docs/design/DESIGN.md`, `demo-frontend/docs/design/SCENARIOS.md`, `demo-frontend/docs/design/ASTRA-UI-PROMPTS.md` | Актуальны | Нурдаулет |
 | Журнал | `docs/history.md` | По коммитам | Нурдаулет |
 
-Папка называется `demo-frontend/`, а не `frontend/`, чтобы не пересекаться с путями из `architecture.md`. Если команда решит, что это и есть основной фронт — переименовать обратно одним `git mv` и заменить путь в `docs/design/*.md`, `demo-frontend/README.md`.
+Папка называется `demo-frontend/`, а не `frontend/`, чтобы не пересекаться с путями из `architecture.md`. Если команда решит, что это и есть основной фронт — переименовать обратно одним `git mv` и заменить путь в `demo-frontend/docs/design/*.md`, `demo-frontend/README.md`.
 
 ---
 
@@ -105,7 +103,7 @@ mode        ← state=partial → "partial"; иначе "live"
 
 ## 4. Что готово во фронте (проверено в браузере, сборка зелёная)
 
-`/` история · `/new` загрузка с дедупликацией и предупреждениями · `/runs/:id` степпер · `/analyses/:id` три вкладки, панель источников с дословными пунктами и подсветкой, карточки рисков, экспорт HTML/печать/CSV, трасса, бейджи режимов · `/analyses/demo` офлайн-пример на реальных пунктах редакций 8 и 9 · мобильная вёрстка. Полный список сценариев и статусов — `docs/design/SCENARIOS.md`.
+`/` история · `/new` загрузка с дедупликацией и предупреждениями · `/runs/:id` степпер · `/analyses/:id` три вкладки, панель источников с дословными пунктами и подсветкой, карточки рисков, экспорт HTML/печать/CSV, трасса, бейджи режимов · `/analyses/demo` офлайн-пример на реальных пунктах редакций 8 и 9 · мобильная вёрстка. Полный список сценариев и статусов — `demo-frontend/docs/design/SCENARIOS.md`.
 
 Не реализовано: проверка человеком (бэкенд готов), RU/ҚАЗ/EN (бэкенд отдаёт `lang`, фронт только RU), ссылка `?finding=`.
 

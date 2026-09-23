@@ -1,6 +1,8 @@
 # Delphi — demo-frontend
 
-React 18 + TypeScript + Vite + Tailwind CSS 4 + shadcn/ui. UI на русском. Дизайн-система и UX-правила: [`docs/design/DESIGN.md`](../docs/design/DESIGN.md). Продуктовые требования: [`docs/product.md`](../docs/product.md).
+React 18 + TypeScript + Vite + Tailwind CSS 4 + shadcn/ui. UI на русском. Дизайн-система и UX-правила: [`docs/design/DESIGN.md`](docs/design/DESIGN.md). Продуктовые требования: [`docs/product.md`](../docs/product.md).
+
+Решения и журнал фронта — [`docs/decisions.md`](docs/decisions.md); дизайн и сценарии — [`docs/design/`](docs/design/). Решения фронта пишутся здесь, а не в корневой `docs/`.
 
 ## Запуск
 

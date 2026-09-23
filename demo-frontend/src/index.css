@@ -3,7 +3,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Delphi tokens — single source: docs/design/DESIGN.md §2 */
+/* Delphi tokens — single source: demo-frontend/docs/design/DESIGN.md §2 */
 :root {
   --radius: 0.5rem;
 
