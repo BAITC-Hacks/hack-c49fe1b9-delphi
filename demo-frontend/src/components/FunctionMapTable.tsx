@@ -122,7 +122,13 @@ export function FunctionMapTable({ functions, onEvidence }: Props) {
         </div>
       </div>
 
-      {rows.length === 0 ? (
+      {functions.length === 0 ? (
+        <EmptyState
+          icon={Search}
+          title="В этом результате нет сопоставленных функций"
+          description="Вывод относится к пересечению или конфликту пунктов «После» — он показан ниже, в «Вопросах для проверки»."
+        />
+      ) : rows.length === 0 ? (
         <EmptyState
           icon={Search}
           title="По фильтру ничего не найдено"
