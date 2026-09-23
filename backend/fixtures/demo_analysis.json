@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "analysis": {
+    "title": "Демо: сравнение редакций внутреннего аудита 8 и 9"
+  },
+  "documents": [
+    {
+      "side": "before",
+      "source_path": "docs/sources/Положение_о_внутреннем_аудите_редакция_8_обезличено.docx",
+      "revision_label": "8"
+    },
+    {
+      "side": "after",
+      "source_path": "docs/hackaton/tracks/Положение_о_внутреннем_аудите_редакция_9_обезличено.docx.md",
+      "revision_label": "9"
+    }
+  ]
+}
