@@ -35,7 +35,7 @@ export default function ProgressPage() {
               <Button size="sm" variant="outline" onClick={() => navigate(`/analyses/${DEMO_ID}`)}>
                 Открыть пример
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => navigate("/")}>
+              <Button size="sm" variant="ghost" onClick={() => navigate("/history")}>
                 К истории
               </Button>
             </AlertDescription>
@@ -67,7 +67,7 @@ export default function ProgressPage() {
           stage={job.stage}
           stageState={job.stage_state}
           counters={job.counters}
-          onCancel={() => navigate("/")}
+          onCancel={() => navigate("/history")}
           onRetryStage={job?.analysis_id && !demoRun ? onRetry : undefined}
           hint={demoRun ? "Воспроизведение сохранённого анализа занимает несколько секунд." : undefined}
         />}
