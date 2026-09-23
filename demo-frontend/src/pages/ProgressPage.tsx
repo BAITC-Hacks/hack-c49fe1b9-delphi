@@ -10,7 +10,7 @@ import { DEMO_ID } from "@/lib/api";
 export default function ProgressPage() {
   const { runId } = useParams<{ runId: string }>();
   const navigate = useNavigate();
-  const { job, error, timedOut, retry } = useJob(runId);
+  const { job, error, retryError, timedOut, retry } = useJob(runId);
 
   useEffect(() => {
     if (job?.result_id) navigate(`/analyses/${encodeURIComponent(job.result_id)}`, { replace: true });
@@ -35,6 +35,12 @@ export default function ProgressPage() {
                 Открыть пример
               </Button>
             </AlertDescription>
+          </Alert>
+        )}
+        {retryError && (
+          <Alert variant="destructive">
+            <AlertTitle>Повтор не запущен</AlertTitle>
+            <AlertDescription>{retryError}</AlertDescription>
           </Alert>
         )}
         {stopped && job?.error && (

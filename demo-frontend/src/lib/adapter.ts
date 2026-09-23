@@ -60,6 +60,23 @@ function inferStoppedStage(run: ApiRunDetail): JobStatus["stage"] {
   return 5;
 }
 
+/** Run errors the backend writes in English (services/workflow.py, agent); other texts pass through. */
+const RUN_ERRORS: [pattern: RegExp, text: string][] = [
+  [/^Analysis exceeded RUN_TIMEOUT_SECONDS/, "Анализ превысил лимит времени сервера"],
+  [/^Application (restarted before the run completed|stopped during the run)/, "Сервер перезапускался во время анализа"],
+  [/^Analysis failed; inspect the server log/, "Анализ завершился ошибкой; подробности — в журнале сервера"],
+  [/^Extraction \((before|after)\): /, "Извлечение функций ($1): "],
+  [/^Function review \((before|after)\): /, "Сопоставление функций ($1): "],
+  [/^Structure: /, "Сравнение структуры: "],
+];
+
+export function runError(message: string): string {
+  for (const [pattern, text] of RUN_ERRORS) {
+    if (pattern.test(message)) return message.replace(pattern, text).replace("(before)", "(«До»)").replace("(after)", "(«После»)");
+  }
+  return message;
+}
+
 export function toJobStatus(run: ApiRunDetail): JobStatus {
   const c = run.coverage;
   const finished = run.state === "completed" || run.state === "partial";
@@ -73,7 +90,7 @@ export function toJobStatus(run: ApiRunDetail): JobStatus {
           : "failed";
   const counters: Record<string, number> = {};
   if (c.total_sources) counters.clauses = c.processed_sources;
-  if (c.total_sources) counters.total = c.total_sources;
+  if (c.total_sources && c.processed_sources < c.total_sources) counters.total = c.total_sources;
   if (c.structure_units) counters.units = c.structure_units;
   if (c.before_functions) counters.functions = c.before_functions;
   if (c.compared_before_functions) counters.matched = c.compared_before_functions;
@@ -84,7 +101,7 @@ export function toJobStatus(run: ApiRunDetail): JobStatus {
     stage_state: stageState,
     counters,
     result_id: finished ? run.analysis_id : undefined,
-    error: run.errors.length ? run.errors.join("; ") : undefined,
+    error: run.errors.length ? run.errors.map(runError).join("; ") : undefined,
     allow_partial: c.allow_partial,
   };
 }
@@ -466,7 +483,7 @@ export function toAnalysisResult(b: LiveBundle): AnalysisResult {
       `Для ${incomplete} ${plural(incomplete, "функции", "функций", "функций")} без соответствия поиск по комплекту «После» неполный — требуется ручная проверка.`,
     );
   }
-  run.errors.forEach((e) => limitations.push(`Ошибка при выполнении: ${e}`));
+  run.errors.forEach((e) => limitations.push(`Ошибка при выполнении: ${runError(e)}`));
   limitations.push(
     `Выводы сформированы моделью ${run.model || "—"} (конвейер ${run.pipeline_version || "—"}), ссылки на пункты проверены по сохранённым текстам документов.`,
   );
@@ -490,7 +507,7 @@ export function toAnalysisResult(b: LiveBundle): AnalysisResult {
     partial: partial
       ? {
           failed_stage: c.unprocessed_source_ids.length ? 2 : c.unreviewed_function_ids.length ? 3 : 0,
-          message: run.errors.join("; ") || (c.input_partial ? "часть текста документов прочитана не полностью" : "не все данные обработаны"),
+          message: run.errors.map(runError).join("; ") || (c.input_partial ? "часть текста документов прочитана не полностью" : "не все данные обработаны"),
         }
       : undefined,
     live: { analysis_id: analysis.id, run_id: run.id, review_revision: run.review_revision },

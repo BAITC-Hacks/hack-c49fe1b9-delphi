@@ -9,6 +9,7 @@ const TIMEOUT_MS = 11 * 60 * 1000; // backend RUN_TIMEOUT_SECONDS is 600 s; allo
 export function useJob(runId: string | undefined) {
   const [job, setJob] = useState<JobStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<string | null>(null);
   const [timedOut, setTimedOut] = useState(false);
   const startedAt = useRef(Date.now());
 
@@ -48,13 +49,14 @@ export function useJob(runId: string | undefined) {
   /** Repeats the analysis with the same documents and options; resolves to the new run id. */
   const retry = useCallback(async (): Promise<string | undefined> => {
     if (!job?.analysis_id) return undefined;
+    setRetryError(null);
     try {
       return await repeatRun(job.analysis_id, job.allow_partial ?? false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось повторить анализ");
+      setRetryError(e instanceof Error ? e.message : "Не удалось повторить анализ");
       return undefined;
     }
   }, [job?.analysis_id, job?.allow_partial]);
 
-  return { job, error, timedOut, retry };
+  return { job, error, retryError, timedOut, retry };
 }
