@@ -16,6 +16,7 @@ import { TracePanel } from "@/components/TracePanel";
 import { UnitTable } from "@/components/UnitTable";
 import { useAnalysis } from "@/hooks/useAnalysis";
 import { DEMO_ID } from "@/lib/api";
+import { plural } from "@/lib/adapter";
 import { UNIT_STATUS } from "@/lib/status";
 import type { EvidenceRequest, UnitStatus } from "@/types";
 
@@ -96,7 +97,9 @@ export default function AnalysisPage() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Результаты сравнения</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {data.units.length} подразделений · {data.functions.length} функций · {data.risks.length} вопросов для проверки
+              {data.units.length} {plural(data.units.length, "подразделение", "подразделения", "подразделений")} ·{" "}
+              {data.functions.length} {plural(data.functions.length, "функция", "функции", "функций")} · {data.risks.length}{" "}
+              {plural(data.risks.length, "вопрос", "вопроса", "вопросов")} для проверки
               {missingCount > 0 && ` · ${missingCount} без найденного соответствия`}
             </p>
           </div>

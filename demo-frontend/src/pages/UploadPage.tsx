@@ -6,7 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/layout/AppShell";
 import { UploadZone } from "@/components/UploadZone";
-import { describeWarnings, isInformational } from "@/lib/adapter";
+import { describeWarnings, isInformational, plural } from "@/lib/adapter";
 import { createAnalysis, deleteDocument, DEMO_ID, getHealth, LIMITS, startRun, uploadDocument } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { ApiDocument, ApiHealth, ApiSide } from "@/types";
@@ -57,7 +57,7 @@ function DocumentLine({ u }: { u: UploadState }) {
           {u.state === "done" && u.doc && (
             <>
               {u.doc.revision_label ? `ред. ${u.doc.revision_label} · ` : ""}
-              {u.doc.block_count} фрагментов текста
+              {u.doc.block_count} {plural(u.doc.block_count, "фрагмент", "фрагмента", "фрагментов")} текста
               {gaps.length > 0 && ` · прочитан частично: ${describeWarnings(gaps).join(", ")}`}
               {info.length > 0 && ` · ${describeWarnings(info).join(", ")}`}
             </>

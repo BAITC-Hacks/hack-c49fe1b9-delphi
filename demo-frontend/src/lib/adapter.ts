@@ -110,6 +110,10 @@ export function editionLabels(documents: ApiDocument[]): Record<string, string> 
   return labels;
 }
 
+function capitalize(s: string): string {
+  return s ? s[0].toUpperCase() + s.slice(1) : s;
+}
+
 function firstLine(text: string, max = 160): string {
   const line = text.trim().split("\n")[0] ?? "";
   return line.length > max ? `${line.slice(0, max - 1)}…` : line;
@@ -183,7 +187,7 @@ const UNIT_OF: Record<ApiStructureChange["status"], UnitStatus> = {
   unmatched: "missing",
 };
 
-function plural(n: number, one: string, few: string, many: string): string {
+export function plural(n: number, one: string, few: string, many: string): string {
   const m10 = n % 10;
   const m100 = n % 100;
   if (m10 === 1 && m100 !== 11) return one;
@@ -259,7 +263,7 @@ export function toAnalysisResult(b: LiveBundle): AnalysisResult {
     return {
       unit: unitName(fn.owner_unit_ids) ?? (fn.actor_original || "Исполнитель не указан"),
       ref,
-      summary: [fn.actor_original, fn.action, fn.object, fn.scope].filter(Boolean).join(" "),
+      summary: capitalize([fn.action, fn.object, fn.scope].filter(Boolean).join(" ")),
     };
   };
 
@@ -330,7 +334,11 @@ export function toAnalysisResult(b: LiveBundle): AnalysisResult {
   for (const f of b.findings) {
     if (!f.issue_type) continue;
     const ev = evidenceRefs(f.id);
-    const sides: RiskSide[] = [...f.before_function_ids, ...f.after_function_ids]
+    // Overlaps and conflicts are between After functions (the backend requires two of them);
+    // modality/scope changes compare Before with After.
+    const between = f.issue_type === "overlap" || f.issue_type === "potential_conflict";
+    const order = between && f.after_function_ids.length >= 2 ? f.after_function_ids : [...f.before_function_ids, ...f.after_function_ids];
+    const sides: RiskSide[] = order
       .map((id) => functionSide(id, ev.all))
       .filter((s): s is FunctionSide => !!s);
     if (sides.length < 2) {
