@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AppShell } from "@/components/layout/AppShell";
 import { EmptyState } from "@/components/EmptyState";
 import { DEMO_ID, getHealth, listAnalyses, type AnalysisSummary } from "@/lib/api";
+import { DEMO_ONLY } from "@/lib/demo";
 import type { ApiHealth } from "@/types";
 
 const STATE_LABEL: Record<string, string> = {
@@ -32,9 +33,10 @@ export default function HistoryPage() {
     listAnalyses()
       .then((list) => !cancelled && setItems(list))
       .catch((e) => { if (!cancelled) { setError(e instanceof Error ? e.message : "Не удалось загрузить историю"); setItems([]); } });
-    getHealth()
-      .then((h) => !cancelled && setHealth(h))
-      .catch(() => !cancelled && setHealth("down"));
+    if (!DEMO_ONLY)
+      getHealth()
+        .then((h) => !cancelled && setHealth(h))
+        .catch(() => !cancelled && setHealth("down"));
     return () => {
       cancelled = true;
     };
@@ -68,7 +70,11 @@ export default function HistoryPage() {
                 </Badge>
               )}
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">Сравнения комплектов документов «До» и «После» реорганизации.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {DEMO_ONLY
+                ? "Демо-версия: сохранённые результаты на реальных обезличенных редакциях и синтетических контрольных примерах."
+                : "Сравнения комплектов документов «До» и «После» реорганизации."}
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" className="gap-2" onClick={() => navigate(`/analyses/${DEMO_ID}`)}>
@@ -114,7 +120,14 @@ export default function HistoryPage() {
               <TableBody>
                 {items.map((a) => (
                   <TableRow key={a.id}>
-                    <TableCell className="font-medium">{a.title || "Без названия"}</TableCell>
+                    <TableCell className="font-medium">
+                      {a.title || "Без названия"}
+                      {a.badge && (
+                        <span className="ml-2 inline-block rounded-full border px-2 py-0.5 align-middle text-xs font-normal text-muted-foreground">
+                          {a.badge}
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{a.created_at ? new Date(a.created_at).toLocaleString("ru-RU") : "—"}</TableCell>
                     {hasDocs && (
                       <TableCell className="text-muted-foreground">

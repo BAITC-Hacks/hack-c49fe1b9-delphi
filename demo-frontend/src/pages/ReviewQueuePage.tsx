@@ -14,9 +14,10 @@ import { useAnalysis } from "@/hooks/useAnalysis";
 import { buildQueue, useReviewQueue } from "@/hooks/useReviewQueue";
 import { plural } from "@/lib/adapter";
 import { DEMO_ID, saveReview } from "@/lib/api";
+import { clearDemoReviews, isDemoId } from "@/lib/demo";
 import { REVIEW_STATUS } from "@/lib/status";
 import { cn } from "@/lib/utils";
-import type { Review, ReviewStatus } from "@/types";
+import type { ReviewStatus } from "@/types";
 
 /**
  * Main working screen: question queue on the left, the change and verbatim quotes on the right,
@@ -25,11 +26,9 @@ import type { Review, ReviewStatus } from "@/types";
 export default function ReviewQueuePage() {
   const { id = DEMO_ID } = useParams<{ id: string }>();
   const { data, error, loading, reload, replace } = useAnalysis(id);
-  /** Offline example: decisions live in this tab only (nothing to save them to). */
-  const [local, setLocal] = useState<Record<string, Review>>({});
   const [mobileDetail, setMobileDetail] = useState(false);
 
-  const items = useMemo(() => (data ? buildQueue(data, local) : []), [data, local]);
+  const items = useMemo(() => (data ? buildQueue(data) : []), [data]);
   const q = useReviewQueue(items);
   const liveResult = !!data?.live;
 
@@ -54,12 +53,9 @@ export default function ReviewQueuePage() {
     if (!item) return;
     const next = q.nextAfterDecision();
     try {
-      if (liveResult) {
-        const result = await saveReview(id, item.id, status, note);
-        if (result) replace(result);
-      } else {
-        setLocal((prev) => ({ ...prev, [item.id]: { status, note: note || undefined } }));
-      }
+      // Live results go to the server; saved examples keep decisions in this browser (lib/demo.ts).
+      const result = await saveReview(id, item.id, status, note);
+      if (result) replace(result);
       toast.success(`${REVIEW_STATUS[status].label}: ${item.title}`);
       if (next && next !== item.id) q.select(next);
     } catch (e) {
@@ -111,6 +107,18 @@ export default function ReviewQueuePage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            {isDemoId(id) && q.reviewedCount > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  clearDemoReviews(id);
+                  void reload();
+                }}
+              >
+                Сбросить решения примера
+              </Button>
+            )}
             <Button asChild size="sm" variant={done ? "default" : "outline"} className="gap-1.5">
               <Link to={`/analyses/${encodeURIComponent(id)}`}>
                 <FileText className="size-4" aria-hidden="true" />

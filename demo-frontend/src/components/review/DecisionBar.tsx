@@ -84,7 +84,7 @@ export function DecisionBar({ itemId, review, localOnly, onDecide }: Props) {
           </Button>
         ))}
         <p className="ml-auto text-xs text-muted-foreground">
-          {localOnly ? "В примере отметки не сохраняются на сервере." : "После решения откроется следующий вопрос. J / K — вниз / вверх."}
+          {localOnly ? "Пример: решения сохраняются в этом браузере. " : ""}После решения откроется следующий вопрос · J / K — вниз / вверх
         </p>
       </div>
     </div>

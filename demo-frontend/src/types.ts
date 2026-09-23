@@ -28,7 +28,8 @@ export interface Review {
   updated_at?: string;
 }
 
-export type Mode = "live" | "cached" | "partial" | "rule_based";
+/** `synthetic`: a labelled control example prepared by hand, never a model run. */
+export type Mode = "live" | "cached" | "partial" | "rule_based" | "synthetic";
 
 export interface ClauseRef {
   /** Document identifier, e.g. "ed8", "ed9" or a backend UUID. */

@@ -195,7 +195,7 @@ export default function AnalysisPage() {
         analysisId={id ?? DEMO_ID}
         onClose={() => { setEvidence(null); const next = new URLSearchParams(params); next.delete("finding"); setParams(next, { replace: true }); }}
         onRetry={reload}
-        onReview={data.live ? onReview : undefined}
+        onReview={onReview}
       />
     </AppShell>
   );

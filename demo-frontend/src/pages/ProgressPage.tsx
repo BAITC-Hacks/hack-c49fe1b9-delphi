@@ -17,6 +17,7 @@ export default function ProgressPage() {
   }, [job?.result_id, navigate]);
 
   const stopped = job?.stage_state === "failed" || job?.stage_state === "interrupted";
+  const demoRun = !!runId?.startsWith("demo:");
 
   const onRetry = async () => {
     const next = await retry();
@@ -37,6 +38,11 @@ export default function ProgressPage() {
             </AlertDescription>
           </Alert>
         )}
+        {demoRun && (
+          <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+            Пример: воспроизводим ход сохранённого анализа. Модель не вызывается.
+          </p>
+        )}
         {retryError && (
           <Alert variant="destructive">
             <AlertTitle>Повтор не запущен</AlertTitle>
@@ -54,7 +60,8 @@ export default function ProgressPage() {
           stageState={job?.stage_state ?? "running"}
           counters={job?.counters}
           onCancel={() => navigate("/")}
-          onRetryStage={job?.analysis_id ? onRetry : undefined}
+          onRetryStage={job?.analysis_id && !demoRun ? onRetry : undefined}
+          hint={demoRun ? "Воспроизведение сохранённого анализа занимает несколько секунд." : undefined}
         />
       </div>
     </AppShell>

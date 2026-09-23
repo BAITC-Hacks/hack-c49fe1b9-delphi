@@ -11,6 +11,13 @@ interface Props {
 /** Honesty badge (DESIGN.md §4.6). Hidden for a live run. */
 export function ModeBadge({ mode, failedStage, className }: Props) {
   if (!mode || mode === "live") return null;
+  if (mode === "synthetic") {
+    return (
+      <Badge variant="outline" className={cn("whitespace-nowrap border-status-split-fg/30 bg-status-split-bg font-normal text-status-split-fg", className)}>
+        Синтетика: контрольный пример, не запуск модели
+      </Badge>
+    );
+  }
   if (mode === "cached") {
     return (
       <Badge variant="secondary" className={cn("whitespace-nowrap font-normal", className)}>

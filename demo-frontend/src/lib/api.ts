@@ -19,6 +19,7 @@ import type {
   ReviewStatus,
 } from "@/types";
 import { editionLabels, toAnalysisResult, toClause, toJobStatus } from "@/lib/adapter";
+import { applyReviews, DEMO_CASES, DEMO_ONLY, demoFiles, isDemoId, loadDemoReviews, storeDemoReview } from "@/lib/demo";
 
 /**
  * Backend API (backend/openapi.json, granular): analyses → documents → runs → findings/functions →
@@ -41,6 +42,8 @@ export interface AnalysisSummary {
   state: string;
   /** History links to the progress screen while running and after a failure. */
   run_id?: string;
+  /** Short label next to the title, e.g. «Синтетика». */
+  badge?: string;
   documents_before?: number;
   documents_after?: number;
   open_questions?: number;
@@ -132,6 +135,17 @@ const HISTORY_STATE: Record<ApiAnalysisListItem["state"], string> = {
 };
 
 export async function listAnalyses(): Promise<AnalysisSummary[]> {
+  if (DEMO_ONLY) {
+    return DEMO_CASES.map((c) => ({
+      id: c.id,
+      title: c.title,
+      created_at: c.created_at,
+      state: "done",
+      badge: c.kind === "synthetic" ? "Синтетика" : "Реальные документы (обезличены)",
+      documents_before: c.before.length,
+      documents_after: c.after.length,
+    }));
+  }
   const items = await request<ApiAnalysisListItem[]>("/api/analyses");
   return items.map((a) => ({
     id: a.id,
@@ -242,26 +256,44 @@ export async function loadLiveBundle(analysisId: string): Promise<LiveBundle> {
   return { analysis, run, findings, functions, sources, evidence, evidenceErrors };
 }
 
-export async function getAnalysis(analysisId: string): Promise<AnalysisResult> {
-  if (analysisId === DEMO_ID) {
-    const res = await fetch("/demo/result.json");
-    if (!res.ok) throw new ApiError(res.status, "Не удалось загрузить пример");
-    return (await res.json()) as AnalysisResult;
+/** Saved example results, loaded once; the analyst's decisions are applied on top (lib/demo.ts). */
+const demoResults = new Map<string, Promise<AnalysisResult>>();
+
+function demoBase(analysisId: string): Promise<AnalysisResult> {
+  let pending = demoResults.get(analysisId);
+  if (!pending) {
+    pending = fetch(demoFiles(analysisId).result).then((res) => {
+      if (!res.ok) throw new ApiError(res.status, "Не удалось загрузить пример");
+      return res.json() as Promise<AnalysisResult>;
+    });
+    pending.catch(() => demoResults.delete(analysisId));
+    demoResults.set(analysisId, pending);
   }
+  return pending;
+}
+
+export async function getAnalysis(analysisId: string): Promise<AnalysisResult> {
+  if (isDemoId(analysisId)) return applyReviews(await demoBase(analysisId), loadDemoReviews(analysisId));
+  if (DEMO_ONLY) throw new ApiError(404, "В демо-версии доступны только сохранённые примеры.");
   const bundle = await loadLiveBundle(analysisId);
   liveBundles.set(analysisId, bundle);
   return toAnalysisResult(bundle);
 }
 
-let demoClauses: Promise<Record<string, Clause>> | null = null;
+const demoClauses = new Map<string, Promise<Record<string, Clause>>>();
 
 export async function getClause(analysisId: string, documentId: string, clauseId: string): Promise<Clause> {
-  if (analysisId === DEMO_ID) {
-    demoClauses ??= fetch("/demo/clauses.json").then((r) => {
-      if (!r.ok) throw new ApiError(r.status, "Не удалось загрузить фрагменты примера");
-      return r.json() as Promise<Record<string, Clause>>;
-    });
-    const map = await demoClauses;
+  if (isDemoId(analysisId)) {
+    let pending = demoClauses.get(analysisId);
+    if (!pending) {
+      pending = fetch(demoFiles(analysisId).clauses).then((r) => {
+        if (!r.ok) throw new ApiError(r.status, "Не удалось загрузить фрагменты примера");
+        return r.json() as Promise<Record<string, Clause>>;
+      });
+      pending.catch(() => demoClauses.delete(analysisId));
+      demoClauses.set(analysisId, pending);
+    }
+    const map = await pending;
     const clause = map[`${documentId}:${clauseId}`];
     if (!clause) throw new ApiError(404, "Пункт не найден в примере");
     return clause;
@@ -286,6 +318,10 @@ export function updateReview(findingId: string, status: ReviewStatus, note: stri
 
 /** Saves a review and returns the result rebuilt from the same bundle (conclusion and export follow it). */
 export async function saveReview(analysisId: string, findingId: string, status: ReviewStatus, note: string) {
+  if (isDemoId(analysisId)) {
+    const reviews = storeDemoReview(analysisId, findingId, { status, note: note || undefined, updated_at: new Date().toISOString() });
+    return applyReviews(await demoBase(analysisId), reviews);
+  }
   const saved = await updateReview(findingId, status, note);
   const bundle = liveBundles.get(analysisId);
   if (!bundle) return getAnalysis(analysisId);

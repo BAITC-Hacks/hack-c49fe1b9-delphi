@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getRun, repeatRun } from "@/lib/api";
+import { getAnalysis, getRun, repeatRun } from "@/lib/api";
 import type { JobStatus } from "@/types";
 
 const POLL_MS = 2000; // architecture.md: UI polls about every two seconds
@@ -13,8 +13,36 @@ export function useJob(runId: string | undefined) {
   const [timedOut, setTimedOut] = useState(false);
   const startedAt = useRef(Date.now());
 
+  // Saved example ("demo:<case>"): replay the five stages, then open the saved result. No model is called.
   useEffect(() => {
-    if (!runId) return;
+    if (!runId?.startsWith("demo:")) return;
+    const caseId = runId.slice("demo:".length);
+    let stage = 1;
+    let counters: Record<string, number> = {};
+    getAnalysis(caseId)
+      .then((r) => {
+        counters = {
+          units: r.units.length,
+          functions: r.functions.length,
+          matched: r.functions.filter((f) => f.status !== "missing").length,
+          risks: r.risks.length,
+        };
+      })
+      .catch(() => undefined);
+    const show = () => setJob({ id: runId, analysis_id: caseId, stage: stage as JobStatus["stage"], stage_state: "running", counters });
+    show();
+    const timer = setInterval(() => {
+      stage += 1;
+      if (stage > 5) {
+        clearInterval(timer);
+        setJob({ id: runId, analysis_id: caseId, stage: 5, stage_state: "done", counters, result_id: caseId });
+      } else show();
+    }, 750);
+    return () => clearInterval(timer);
+  }, [runId]);
+
+  useEffect(() => {
+    if (!runId || runId.startsWith("demo:")) return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     startedAt.current = Date.now();
