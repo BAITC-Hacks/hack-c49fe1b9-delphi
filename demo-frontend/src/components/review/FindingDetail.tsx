@@ -83,7 +83,7 @@ export function FindingDetail({ item, analysisId }: { item: QueueItem; analysisI
         </p>
       )}
 
-      {item.search && (
+      {(item.search || item.searchIncomplete) && (
         <p
           className={
             item.searchIncomplete
@@ -91,7 +91,9 @@ export function FindingDetail({ item, analysisId }: { item: QueueItem; analysisI
               : "rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
           }
         >
-          {item.search}
+          {item.searchUnknown
+            ? "Полнота поиска не подтверждена: данные о покрытии поиска по комплекту «После» отсутствуют. Проверьте комплект перед подтверждением вывода."
+            : item.search || "Поиск по комплекту «После» выполнен не полностью."}
         </p>
       )}
 

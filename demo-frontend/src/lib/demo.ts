@@ -147,12 +147,18 @@ export function applyReviews(base: AnalysisResult, reviews: Record<string, Revie
   if (decided.length) {
     sections.push({
       title: "Проверка человеком",
-      items: [{ text: `Проверено вопросов: ${decided.filter(([id]) => !quiet.has(id)).length} из ${questions} (${summary}). Решения не меняют выводы ИИ.`, refs: [] }],
+      items: [{ text: `Проверено вопросов: ${decided.filter(([id]) => !quiet.has(id)).length} из ${questions} (${summary}). Решения не меняют исходные выводы.`, refs: [] }],
     });
   }
   const confirmed = listOf("confirmed", "Комментарий");
   if (confirmed.length) sections.push({ title: "Подтверждено проверяющим", items: confirmed });
-  sections.push(...base.conclusion.sections);
+  const rejectedIds = new Set(decided.filter(([, r]) => r.status === "rejected").map(([id]) => id));
+  sections.push(...base.conclusion.sections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.finding_id || !rejectedIds.has(item.finding_id)),
+    }))
+    .filter((section) => section.items.length > 0));
   const open = listOf("needs_clarification", "Заметка проверяющего");
   if (open.length) sections.push({ title: "Вопросы без окончательной проверки", items: open });
   const rejected = listOf("rejected", "Причина");

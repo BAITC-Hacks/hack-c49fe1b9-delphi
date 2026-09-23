@@ -117,7 +117,7 @@ export function QueueList(props: Props) {
                 >
                   <div className="flex flex-wrap items-center gap-1.5">
                     <StatusChip status={item.status} kind={item.kind} />
-                    {item.searchIncomplete && <span className="text-xs font-medium text-status-missing-fg">неполный поиск</span>}
+                    {item.searchIncomplete && <span className="text-xs font-medium text-status-missing-fg">{item.searchUnknown ? "полнота поиска неизвестна" : "неполный поиск"}</span>}
                     <ReviewChip review={item.review} className="ml-auto" />
                   </div>
                   <p className="text-sm font-medium leading-snug">{item.title}</p>

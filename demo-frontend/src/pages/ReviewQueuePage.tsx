@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AlertTriangle, ArrowLeft, FileText } from "lucide-react";
 import { toast } from "sonner";
@@ -26,16 +26,29 @@ import type { ReviewStatus } from "@/types";
 export default function ReviewQueuePage() {
   const { id = DEMO_ID } = useParams<{ id: string }>();
   const { data, error, loading, reload, replace } = useAnalysis(id);
-  const [mobileDetail, setMobileDetail] = useState(false);
 
   const items = useMemo(() => (data ? buildQueue(data) : []), [data]);
   const q = useReviewQueue(items);
   const liveResult = !!data?.live;
+  const mobileDetail = q.detailOpen;
+  const decisionBarRef = useRef<HTMLDivElement>(null);
+  const [decisionBarHeight, setDecisionBarHeight] = useState(0);
+
+  // Reserve the measured bar height so even the final quote stays readable on a phone.
+  useEffect(() => {
+    const bar = decisionBarRef.current;
+    if (!bar) return;
+    const measure = () => setDecisionBarHeight(bar.getBoundingClientRect().height);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, [loading, mobileDetail, q.selected?.id]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
-      if (e.metaKey || e.ctrlKey || e.altKey || (t && (t.tagName === "TEXTAREA" || t.tagName === "INPUT"))) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || (t && (t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.tagName === "SELECT" || t.isContentEditable))) return;
       if (e.key === "j" || e.key === "ArrowDown") {
         e.preventDefault();
         q.step(1);
@@ -102,7 +115,7 @@ export default function ReviewQueuePage() {
             <h1 className="text-2xl font-semibold tracking-tight">Проверка выводов</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Проверено {q.reviewedCount} из {q.questionsCount}{" "}
-              {plural(q.questionsCount, "вопроса", "вопросов", "вопросов")}. Решение человека не меняет вывод ИИ и попадает в
+              {plural(q.questionsCount, "вопроса", "вопросов", "вопросов")}. Решение человека не меняет исходный вывод и попадает в
               заключение.
             </p>
           </div>
@@ -143,10 +156,7 @@ export default function ReviewQueuePage() {
               quietCount={q.quietCount}
               withQuiet={q.withQuiet}
               coverageComplete={data.coverage?.complete === true}
-              onSelect={(itemId) => {
-                q.select(itemId);
-                setMobileDetail(true);
-              }}
+              onSelect={q.select}
               onScope={q.setScope}
               onToggleStatus={q.toggleStatus}
               onWithQuiet={q.setWithQuiet}
@@ -156,14 +166,18 @@ export default function ReviewQueuePage() {
 
           <section className={cn("min-w-0 lg:block", !mobileDetail && "hidden")} aria-live="polite">
             {q.selected ? (
-              <div className="flex flex-col overflow-hidden rounded-lg border bg-background">
+              <div className="flex flex-col rounded-lg border bg-background">
                 <div className="flex flex-col gap-4 p-4 md:p-5">
-                  <Button variant="ghost" size="sm" className="-ml-2 w-fit gap-1 lg:hidden" onClick={() => setMobileDetail(false)}>
+                  <Button variant="ghost" size="sm" className="-ml-2 w-fit gap-1 lg:hidden" onClick={q.closeDetail}>
                     <ArrowLeft className="size-4" aria-hidden="true" />К очереди
                   </Button>
                   <FindingDetail item={q.selected} analysisId={id} />
                 </div>
-                <div className="sticky bottom-0">
+                <div className="lg:hidden" style={{ height: decisionBarHeight }} aria-hidden="true" />
+                <div
+                  ref={decisionBarRef}
+                  className="fixed inset-x-0 bottom-0 z-30 bg-card pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgb(0_0_0/0.08)] lg:sticky lg:inset-x-auto lg:z-10 lg:rounded-b-lg lg:pb-0 lg:shadow-none"
+                >
                   <DecisionBar itemId={q.selected.id} review={q.selected.review} localOnly={!liveResult} onDecide={decide} />
                 </div>
               </div>

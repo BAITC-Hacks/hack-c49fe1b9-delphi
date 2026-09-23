@@ -29,16 +29,19 @@ export default function ProgressPage() {
       <div className="mx-auto flex max-w-2xl flex-col gap-4">
         {(error || timedOut) && (
           <Alert variant={timedOut ? "default" : "destructive"}>
-            <AlertTitle>{timedOut ? "Анализ идёт дольше обычного" : "Не удалось получить статус"}</AlertTitle>
+            <AlertTitle>{timedOut ? "Анализ идёт дольше обычного" : demoRun ? "Не удалось открыть пример" : "Не удалось получить статус"}</AlertTitle>
             <AlertDescription className="flex flex-wrap items-center gap-2">
               <span>{timedOut ? "Сервер не ответил за 10 минут. Можно подождать или открыть пример." : error}</span>
               <Button size="sm" variant="outline" onClick={() => navigate(`/analyses/${DEMO_ID}`)}>
                 Открыть пример
               </Button>
+              <Button size="sm" variant="ghost" onClick={() => navigate("/")}>
+                К истории
+              </Button>
             </AlertDescription>
           </Alert>
         )}
-        {demoRun && (
+        {demoRun && job && !error && (
           <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
             Пример: воспроизводим ход сохранённого анализа. Модель не вызывается.
           </p>
@@ -55,14 +58,19 @@ export default function ProgressPage() {
             <AlertDescription>{job.error}</AlertDescription>
           </Alert>
         )}
-        <AnalysisProgress
-          stage={job?.stage ?? 1}
-          stageState={job?.stage_state ?? "running"}
-          counters={job?.counters}
+        {!job && !error && (
+          <p role="status" className="text-sm text-muted-foreground">
+            {demoRun ? "Проверяем доступность сохранённого примера…" : "Получаем статус анализа…"}
+          </p>
+        )}
+        {job && !error && <AnalysisProgress
+          stage={job.stage}
+          stageState={job.stage_state}
+          counters={job.counters}
           onCancel={() => navigate("/")}
           onRetryStage={job?.analysis_id && !demoRun ? onRetry : undefined}
           hint={demoRun ? "Воспроизведение сохранённого анализа занимает несколько секунд." : undefined}
-        />
+        />}
       </div>
     </AppShell>
   );

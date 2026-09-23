@@ -49,10 +49,10 @@ export const FUNCTION_STATUS: Record<FunctionStatus, StatusMeta> = {
   },
   duplicate: { label: "Возможное дублирование", icon: Copy, className: tone.duplicate },
   conflict: {
-    label: "Возможный конфликт интересов",
+    label: "Возможный конфликт",
     icon: AlertTriangle,
     className: tone.conflict,
-    hint: "Требует проверки ответственным сотрудником.",
+    hint: "Конфликт интересов или противоречие требований — требует проверки ответственным сотрудником.",
   },
   new: { label: "Добавлено", icon: Plus, className: tone.new },
 };

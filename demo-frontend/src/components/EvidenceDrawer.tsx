@@ -57,6 +57,7 @@ export function EvidenceDetails({ request, analysisId, onReview, onRetry }: Omit
         <p>Не удалось загрузить доказательства. Показаны доступные исходные фрагменты; подтвердить вывод пока нельзя.</p><p>{request.error}</p>
         {onRetry && <Button variant="outline" size="sm" onClick={onRetry}><RefreshCw className="size-4" aria-hidden="true" />Повторить загрузку</Button>}
       </div>}
+      {request.status === "missing" && request.searchComplete === undefined && <p className="rounded-lg bg-status-missing-bg p-3 text-sm text-status-missing-fg">Полнота поиска не подтверждена. Проверьте весь комплект «После» перед окончательным решением.</p>}
       {request.searchComplete === false && <p className="rounded-lg bg-status-missing-bg p-3 text-sm text-status-missing-fg">Поиск по комплекту «После» неполный. Отсутствие соответствия пока нельзя подтвердить.</p>}
       <div className={`grid min-w-0 gap-4 ${before.length && after.length ? "xl:grid-cols-2" : ""}`}>
         {before.length > 0 && <SourceColumn label="До" refs={before} request={request} analysisId={analysisId} />}

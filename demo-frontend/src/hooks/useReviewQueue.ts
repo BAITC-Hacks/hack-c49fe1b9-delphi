@@ -34,6 +34,8 @@ export interface QueueItem {
   recommendation?: string;
   search?: string;
   searchIncomplete: boolean;
+  /** No per-finding search coverage was supplied. */
+  searchUnknown?: boolean;
   review: Review;
 }
 
@@ -62,7 +64,7 @@ export function buildQueue(result: AnalysisResult, overrides: Record<string, Rev
   const items = new Map<string, QueueItem>();
   for (const f of result.functions) {
     const ev = functionEvidence(f);
-    const incomplete = f.status === "missing" && !!f.search && !f.search.complete;
+    const incomplete = f.status === "missing" && f.search?.complete !== true;
     items.set(f.id, {
       id: f.id,
       kind: "function",
@@ -80,6 +82,7 @@ export function buildQueue(result: AnalysisResult, overrides: Record<string, Rev
       recommendation: f.recommendation,
       search: f.search?.text,
       searchIncomplete: incomplete,
+      searchUnknown: f.status === "missing" && !f.search,
       review: overrides[f.id] ?? f.review ?? UNREVIEWED,
     });
   }
@@ -106,6 +109,7 @@ export function buildQueue(result: AnalysisResult, overrides: Record<string, Rev
       recommendation: r.check,
       search: base?.search,
       searchIncomplete: base?.searchIncomplete ?? false,
+      searchUnknown: base?.searchUnknown,
       review: overrides[r.id] ?? r.review ?? base?.review ?? UNREVIEWED,
     });
   }
@@ -190,7 +194,8 @@ export function useReviewQueue(items: QueueItem[]) {
     [statuses, update],
   );
   const setWithQuiet = useCallback((on: boolean) => update({ all: on ? "1" : null }), [update]);
-  const resetFilters = useCallback(() => update({ status: null, review: null, all: null, f: null }), [update]);
+  const resetFilters = useCallback(() => update({ status: null, review: "all", all: "1", f: null }), [update]);
+  const closeDetail = useCallback(() => update({ f: null }), [update]);
 
   const index = selected ? visible.findIndex((i) => i.id === selected.id) : -1;
   const step = useCallback(
@@ -211,6 +216,8 @@ export function useReviewQueue(items: QueueItem[]) {
   return {
     visible,
     selected,
+    detailOpen: !!wanted && selected?.id === wanted,
+    closeDetail,
     index,
     scope,
     statuses,

@@ -12,13 +12,13 @@ const ACTIONS: { status: ReviewStatus; label: string; key: string; icon: typeof 
 interface Props {
   itemId: string;
   review: Review;
-  /** Offline example: decisions stay in this tab only. */
+  /** Offline example: decisions stay in this browser only. */
   localOnly: boolean;
   onDecide(status: ReviewStatus, note: string): Promise<void>;
 }
 
 const typing = (el: EventTarget | null) =>
-  el instanceof HTMLElement && (el.tagName === "TEXTAREA" || el.tagName === "INPUT" || el.isContentEditable);
+  el instanceof HTMLElement && (el.tagName === "TEXTAREA" || el.tagName === "INPUT" || el.tagName === "SELECT" || el.isContentEditable);
 
 /** Bottom bar: the human decision. Keys 1/2/3 decide, Ctrl/⌘+Enter in the note saves with the current status. */
 export function DecisionBar({ itemId, review, localOnly, onDecide }: Props) {

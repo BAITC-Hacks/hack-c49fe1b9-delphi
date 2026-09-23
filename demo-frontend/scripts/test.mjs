@@ -22,4 +22,6 @@ function load(file) {
   new Function("require", "module", "exports", output)(resolve, module, module.exports);
   return module.exports;
 }
-load(path.join(root, "tests/evidence.test.ts"));
+for (const name of fs.readdirSync(path.join(root, "tests")).filter((name) => name.endsWith(".test.ts")).sort()) {
+  load(path.join(root, "tests", name));
+}
