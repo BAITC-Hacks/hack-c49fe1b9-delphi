@@ -249,15 +249,16 @@ class ResumeBudgetTests(unittest.TestCase):
         budget = json.loads((self.directory / "run_budget_fake" / "budget.json").read_text(encoding="utf-8"))
         self.assertEqual(len(budget["pending_reservations"]), 1)
 
-    def test_unknown_retry_cost_with_cap_stops_before_second_attempt(self):
+    def test_unknown_retry_cost_with_cap_is_covered_by_separate_durable_hold(self):
         failure = APIConnectionError(request=httpx.Request("POST", "https://api.openai.com/v1/responses"))
         with patch.dict(os.environ, {"LAB_COST_BUDGET_USD": "10"}):
             runner = self.runner(failure, response("resp_must_not_retry"))
-            with self.assertRaises((ValueError, agent._Stopped)):
-                self.request(runner)
-        self.assertEqual(len(runner.client.requests), 1)
-        self.assertEqual(len(self.events()), 1)
+            self.request(runner)
+        self.assertEqual(len(runner.client.requests), 2)
+        self.assertEqual(len(self.events()), 2)
         self.assertIsNone(self.events()[0]["cost_usd"])
+        budget = json.loads((self.directory / "run_budget_fake" / "budget.json").read_text(encoding="utf-8"))
+        self.assertIn(self.events()[0]['event_id'], budget['unknown_reservations'])
 
     def test_persisted_reservation_counts_for_a_new_observer(self):
         options = {"model": "gpt-6-sol", "input": [], "max_output_tokens": 5000}

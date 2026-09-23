@@ -418,7 +418,9 @@ class CostTrackingTests(unittest.TestCase):
             "issue_type": "uncertainty", "before_function_ids": [], "after_function_ids": [],
             "explanation": "Explanation", "recommendation": "Recommendation", "evidence": [],
         }])
-        translation = {"locale": "en", "findings": [{"id": "finding_memory", "title": "Translated"}]}
+        translation = {"locale": "en", "findings": [{"id": "finding_memory", "title": "Translated",
+                                                     "explanation": "Translated explanation",
+                                                     "recommendation": "Translated recommendation"}]}
         with patch.object(agent, "translate_result", return_value=translation) as translate:
             first = pipeline.translate_saved(store, store.value["id"], "en", Settings(model="gpt-6-sol"))
             second = pipeline.translate_saved(store, store.value["id"], "en", Settings(model="gpt-6-sol"))

@@ -3,8 +3,9 @@ import tempfile
 
 from .config import Settings, require_live_config
 from .models import AgentResult, Finding
-from .storage import Store, uid, now
+from .storage import Store, uid, now, validate_translation
 from .validation import validate_result
+from .provenance import prompt_manifest
 
 
 def upload_bytes(store: Store, analysis_id: str, filename: str, side: str, content: bytes) -> dict:
@@ -50,8 +51,13 @@ def execute_run(store: Store, run_id: str, settings: Settings, *, resume: bool =
             raise ValueError('Only a stopped partial, failed or interrupted live run can be resumed.')
         if run['model'] != settings.model:
             raise ValueError('A resumed run must use its original model; restore OPENAI_MODEL.')
+        if run.get('prompt_manifest') and run['prompt_manifest'] != prompt_manifest():
+            raise ValueError('Prompt version changed; restore the original prompts or create another analysis.')
         if run.get('immutable_document_ids') != [doc.id for doc in documents]:
             raise ValueError('Saved immutable document IDs do not match the documents for this run.')
+        if any(f.get('review', {}).get('status', 'unreviewed') != 'unreviewed'
+               or f.get('review', {}).get('note', '') for f in run['findings']):
+            raise ValueError('A reviewed run is frozen; create another analysis to preserve human decisions.')
         if any(item['state'] in {'queued', 'running'} for item in store.list_analyses()):
             raise ValueError('Another lab run is active; wait until it stops before resuming.')
         require_live_config(run['model'])
@@ -63,6 +69,9 @@ def execute_run(store: Store, run_id: str, settings: Settings, *, resume: bool =
              'id': finding['id'].removeprefix(prefix)} for finding in run['findings']
         ]
         resume_result = AgentResult.model_validate(snapshot)
+        if not run.get('prompt_manifest'):
+            resume_result.trace.append({'operation': 'legacy_prompt_version',
+                                        'message': 'Earlier prompt fingerprint unavailable; sources and accepted results retained.'})
         validate_result(resume_result, documents)
         # Saved translations are keyed by this revision. Resumed work may add
         # findings, so the old translated snapshot must not be returned as current.
@@ -125,20 +134,21 @@ def translate_saved(store: Store, run_id: str, locale: str, settings: Settings) 
         raise ValueError('Wait until the run stops before translating.')
     cached = store.translation(run_id, run['review_revision'], locale)
     if cached:
+        validate_translation(run, locale, cached)
         return cached
     if locale == run['output_language']:
         payload = {'locale': locale, 'findings': [
-            {k: f[k] for k in ('id', 'title', 'explanation', 'recommendation')} for f in run['findings']]}
-    elif not run['findings']:
-        payload = {'locale': locale, 'findings': []}
+            {k: f[k] for k in ('id', 'title', 'explanation', 'recommendation')} for f in run['findings']],
+                   'structure': [{k: item[k] for k in ('id', 'explanation')} for item in run.get('structure', [])]}
+    elif not run['findings'] and not run.get('structure'):
+        payload = {'locale': locale, 'findings': [], 'structure': []}
     else:
         from .agent import translate_result
         require_live_config(settings.model)
         allowed = Finding.model_fields
         result = AgentResult(findings=[Finding.model_validate({k: v for k, v in f.items() if k in allowed})
-                                      for f in run['findings']])
+                                      for f in run['findings']], structure=run.get('structure', []))
         payload = translate_result(result, locale, settings.model, run_id=run_id)
-        if {f['id'] for f in payload['findings']} != {f['id'] for f in run['findings']}:
-            raise ValueError('Translation changed finding IDs')
+    validate_translation(run, locale, payload)
     store.save_translation(run_id, run['review_revision'], locale, payload)
     return payload

@@ -215,10 +215,10 @@ _START_NUMBER = re.compile(r"^(\d{1,2}(?:\.\d{1,3}){0,3})\.(?=\s|[^\W\d_])", re.
 _EMBEDDED_NUMBER = re.compile(r"(?<=\s)(\d{1,2}(?:\.\d{1,3}){0,3})\.(?=[A-ZА-ЯӘІҢҒҮҰҚӨҺ])")
 
 
-def _segments(text: str) -> Iterator[tuple[int, int]]:
+def _segments(text: str, clause_numbers: bool = True) -> Iterator[tuple[int, int]]:
     """Recognize explicit glued clause boundaries, then bound long fragments."""
     boundaries = [0]
-    for match in _EMBEDDED_NUMBER.finditer(text):
+    for match in _EMBEDDED_NUMBER.finditer(text) if clause_numbers else ():
         # A clause immediately followed by its capitalized sentence is a common
         # Word-export defect. Decimal references followed by whitespace do not
         # match, preventing a reference such as "п. 5.8.1" becoming a clause.
@@ -257,14 +257,14 @@ def _build_blocks(raw_blocks: Iterator[_RawBlock], document_id: str, side: Side,
     numbered: SourceBlock | None = None
     unnumbered_heading: SourceBlock | None = None
     section = None
-    heading_section = None
+    heading_anchor: str | None = None
     in_toc = False
     total_chars = 0
     for raw in raw_blocks:
         total_chars += len(raw.text)
         if total_chars > MAX_TEXT_CHARS:
             raise ParseError("TEXT_LIMIT: extracted document is too large")
-        for start, end in _segments(raw.text):
+        for start, end in _segments(raw.text, raw.clause_numbers):
             original = raw.text[start:end]
             normalized = normalize_text(original)
             if not normalized:
@@ -316,10 +316,26 @@ def _build_blocks(raw_blocks: Iterator[_RawBlock], document_id: str, side: Side,
                     if len(parts) == 1:
                         section = parts[0]
                         unnumbered_heading = None
-                    elif unnumbered_heading and heading_section == parts[0] and len(parts) == 2:
-                        parent = unnumbered_heading.id
+                        heading_anchor = None
+                    elif unnumbered_heading:
+                        # An unnumbered role can introduce several numbered
+                        # duties (5 -> Chief -> 5.1/5.2). A new explicit
+                        # numbered heading starts its own scope. An inner list
+                        # heading under 9.5 must never become parent of 9.6.
+                        inside_anchor = bool(heading_anchor and clause_no.startswith(heading_anchor + "."))
+                        remainder = normalized[match.end():].strip() if match else normalized
+                        explicit_role = bool(re.search(
+                            r"^(?:(?:главный|chief|audit|senior|бас)\s+)?(?:директор\w*|руководител\w*|начальник\w*|аудитор\w*|director|head|manager|auditor|басшы\w*|директор\w*)\b",
+                            remainder, re.I)) and not re.search(
+                                r"\b(?:обязан\w*|долж\w*|вправе|must|shall|may|міндет\w*)\b", remainder, re.I)
+                        starts_scope = kind == "heading" and (raw.heading or explicit_role)
+                        if starts_scope or not inside_anchor:
+                            unnumbered_heading = None
+                            heading_anchor = None
+                        elif parent == unnumbered_heading.parent_id:
+                            parent = unnumbered_heading.id
                 elif kind == "heading":
-                    parent = by_number[section].id if section in by_number else None
+                    parent = numbered.id if numbered else by_number[section].id if section in by_number else None
                 elif numbered:
                     parent = numbered.id
                 elif unnumbered_heading:
@@ -340,7 +356,8 @@ def _build_blocks(raw_blocks: Iterator[_RawBlock], document_id: str, side: Side,
                         warnings.append(f"EMPTY_CLAUSE: {clause_no} at {block.locator}; missing content is not reconstructed.")
                 elif kind == "heading":
                     unnumbered_heading = block
-                    heading_section = section
+                    anchor = next((b for b in reversed(blocks[:-1]) if b.id == parent), None)
+                    heading_anchor = anchor.clause_no if anchor else None
                     numbered = None
     return blocks
 

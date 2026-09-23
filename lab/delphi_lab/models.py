@@ -40,6 +40,25 @@ class Unit(StrictModel):
     kind: Literal["unit", "role", "group"]
     name_original: str
     source_ids: list[str]
+    parent_unit_id: str | None = None
+
+
+class StructureChange(StrictModel):
+    id: str
+    before_unit_ids: list[str]
+    after_unit_ids: list[str]
+    status: Literal['retained', 'newly_listed', 'transformed', 'unmatched']
+    source_ids: list[str]
+    explanation: str
+
+
+class SourceSearch(StrictModel):
+    side: Side
+    method: Literal['semantic_all_source_batches'] = 'semantic_all_source_batches'
+    reviewed_source_ids: list[str] = Field(default_factory=list)
+    candidate_source_ids: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    complete: bool = False
 
 
 class Function(StrictModel):
@@ -73,12 +92,14 @@ class Finding(StrictModel):
     recommendation: str
     evidence: list[Evidence]
     search_queries: list[str] = Field(default_factory=list)
+    search: SourceSearch | None = None
 
 
 class AgentResult(StrictModel):
     units: list[Unit] = Field(default_factory=list)
     functions: list[Function] = Field(default_factory=list)
     findings: list[Finding] = Field(default_factory=list)
+    structure: list[StructureChange] = Field(default_factory=list)
     trace: list[dict] = Field(default_factory=list)
     usage: dict = Field(default_factory=dict)
     errors: list[str] = Field(default_factory=list)

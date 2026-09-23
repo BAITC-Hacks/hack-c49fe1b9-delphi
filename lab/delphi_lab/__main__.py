@@ -46,6 +46,9 @@ def main() -> int:
         command.add_argument('--language', choices=['ru', 'kk', 'en'], default='ru')
         command.add_argument('--title', default='Lab comparison')
         command.add_argument('--allow-limited', action='store_true', help='Acknowledge parsing warnings')
+        command.add_argument('--max-calls', type=int, help='Explicit total API call ceiling')
+        command.add_argument('--timeout-seconds', type=int, help='Explicit run time allowance')
+        command.add_argument('--cost-budget-usd', help='Cumulative USD ceiling for this run')
         if name == 'demo':
             command.add_argument('--fixture', choices=['real', 'ru', 'kk', 'en'], default='real')
         else:
@@ -56,6 +59,9 @@ def main() -> int:
     parse.add_argument('--side', choices=['before', 'after'], default='before')
     sub.add_parser('history')
     sub.add_parser('recover', help='Mark a stopped process interrupted; use only when no server/run is active')
+    estimate_command = sub.add_parser('estimate', help='Free lower bound for extraction calls in a saved run')
+    estimate_command.add_argument('run_id')
+    estimate_command.add_argument('--resume', action='store_true')
     resume = sub.add_parser('resume', help='Resume accepted work in a stopped live run without re-extracting completed blocks')
     resume.add_argument('run_id')
     resume.add_argument('--max-calls', type=int, help='Total API call ceiling including earlier attempts in this run')
@@ -79,6 +85,24 @@ def main() -> int:
     previous_cost_budget = os.environ.get('LAB_COST_BUDGET_USD')
     changed_cost_budget = False
     try:
+        limits = {}
+        for name in ('max_calls', 'timeout_seconds'):
+            value = getattr(args, name, None)
+            if value is not None:
+                if value <= 0:
+                    raise ValueError(f'{name} must be positive')
+                limits[name] = value
+        settings = replace(settings, **limits)
+        requested_budget = getattr(args, 'cost_budget_usd', None)
+        if requested_budget is not None:
+            try:
+                ceiling = Decimal(requested_budget)
+                if not ceiling.is_finite() or ceiling <= 0:
+                    raise InvalidOperation
+            except InvalidOperation:
+                raise ValueError('--cost-budget-usd must be a positive finite USD amount') from None
+            os.environ['LAB_COST_BUDGET_USD'] = str(ceiling)
+            changed_cost_budget = True
         if args.command == 'serve':
             import uvicorn
             uvicorn.run('delphi_lab.api:app', host='127.0.0.1', port=args.port, workers=1)
@@ -95,6 +119,10 @@ def main() -> int:
             dump({'interrupted_runs': store.recover_interrupted()})
         elif args.command == 'show':
             dump(store.run(args.run_id))
+        elif args.command == 'estimate':
+            from .planning import estimate
+            run = store.run(args.run_id)
+            dump(estimate(store.documents(args.run_id), settings, saved_run=run if args.resume else None))
         elif args.command == 'export':
             dump(export(store, args.run_id, args.language))
         elif args.command == 'review':
@@ -103,23 +131,6 @@ def main() -> int:
             cost_run_id = args.run_id
             dump(translate_saved(store, args.run_id, args.language, settings))
         elif args.command == 'resume':
-            limits = {}
-            for name in ('max_calls', 'timeout_seconds'):
-                value = getattr(args, name)
-                if value is not None:
-                    if value <= 0:
-                        raise ValueError(f'{name} must be positive')
-                    limits[name] = value
-            settings = replace(settings, **limits)
-            if args.cost_budget_usd is not None:
-                try:
-                    ceiling = Decimal(args.cost_budget_usd)
-                    if not ceiling.is_finite() or ceiling <= 0:
-                        raise InvalidOperation
-                except InvalidOperation:
-                    raise ValueError('--cost-budget-usd must be a positive finite USD amount') from None
-                os.environ['LAB_COST_BUDGET_USD'] = str(ceiling)
-                changed_cost_budget = True
             cost_run_id = args.run_id
             run = execute_run(store, args.run_id, settings, resume=True)
             result = export(store, args.run_id, run['output_language'])
@@ -131,7 +142,7 @@ def main() -> int:
             if args.command == 'demo':
                 if args.fixture == 'real':
                     before = [next((REPO_ROOT / 'docs/sources').glob('*8*.docx'))]
-                    after = [next((REPO_ROOT / 'docs/hackaton/tracks').glob('*9*.docx.md'))]
+                    after = [next((REPO_ROOT / 'docs/sources').glob('*9*.docx'))]
                 else:
                     folder = LAB_ROOT / 'fixtures/synthetic' / args.fixture
                     before, after = [folder / 'before.md'], [folder / 'after.md']
@@ -144,6 +155,9 @@ def main() -> int:
             run = store.start(analysis['id'], args.mode, args.language, settings.model, args.allow_limited)
             if args.mode == 'live':
                 cost_run_id = run['id']
+                from .planning import estimate
+                print(json.dumps({'preflight': estimate(store.documents(run['id']), settings)},
+                                 ensure_ascii=False), file=sys.stderr)
             execute_run(store, run['id'], settings)
             result = export(store, run['id'], args.language)
             dump(result)

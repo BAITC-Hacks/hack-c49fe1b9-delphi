@@ -8,6 +8,7 @@ import sqlite3
 
 from .config import data_dir
 from .models import Document
+from .provenance import prompt_manifest
 
 
 def now() -> str:
@@ -102,11 +103,17 @@ class Store:
 
     def start(self, analysis_id: str, mode: str, language: str, model: str,
               allow_limited: bool) -> dict:
+        if mode not in {'preprocess', 'live'} or language not in {'ru', 'kk', 'en'}:
+            raise ValueError('Unsupported run mode or language.')
         with self.connection() as cx:
             cx.execute('BEGIN IMMEDIATE')
             existing = cx.execute('SELECT payload FROM runs WHERE analysis_id=?', (analysis_id,)).fetchone()
             if existing:
-                return json.loads(existing['payload'])  # idempotent start
+                saved = json.loads(existing['payload'])
+                if (saved['mode'], saved['output_language'], saved['model']) != (
+                        mode, language, model if mode == 'live' else None):
+                    raise ValueError('This analysis already has a run with different options.')
+                return saved  # idempotent start
             if cx.execute("SELECT id FROM runs WHERE state IN ('queued','running')").fetchone():
                 raise ValueError('One active lab run at a time. Use the current run or wait.')
             docs = [Document.model_validate_json(r['payload']) for r in cx.execute(
@@ -120,9 +127,10 @@ class Store:
             row = {
                 'id': uid('run'), 'analysis_id': analysis_id, 'state': 'queued', 'stage': 'queued',
                 'mode': mode, 'model': model if mode == 'live' else None, 'output_language': language,
-                'pipeline_version': 'lab-0.1', 'review_revision': 0, 'started_at': now(),
+                'pipeline_version': 'lab-0.2', 'review_revision': 0, 'started_at': now(),
+                'prompt_manifest': prompt_manifest(),
                 'finished_at': None, 'immutable_document_ids': [d.id for d in docs],
-                'coverage': {}, 'errors': [], 'units': [], 'functions': [], 'findings': [],
+                'coverage': {}, 'errors': [], 'units': [], 'structure': [], 'functions': [], 'findings': [],
                 'trace': [], 'usage': {}, 'diff': {}, 'limitations': [w for d in docs for w in d.warnings],
             }
             cx.execute('INSERT INTO runs VALUES (?, ?, ?, ?)',
@@ -139,6 +147,10 @@ class Store:
             existing = cx.execute('SELECT payload FROM runs WHERE id=?', (run['id'],)).fetchone()
             if not existing:
                 raise KeyError(run['id'])
+            saved = json.loads(existing['payload'])
+            for field in ('analysis_id', 'immutable_document_ids', 'model', 'mode', 'output_language'):
+                if saved.get(field) != run.get(field):
+                    raise ValueError(f'Cannot change saved run identity: {field}')
             # Only the pipeline writes here, before reviews become available.
             cx.execute('UPDATE runs SET state=?, payload=? WHERE id=?',
                        (run['state'], encode(run), run['id']))
@@ -146,6 +158,12 @@ class Store:
                 cx.execute('''INSERT INTO findings VALUES (?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET payload=excluded.payload''',
                            (finding['id'], run['id'], encode(finding)))
+            current_ids = {finding['id'] for finding in run['findings']}
+            obsolete = [row['id'] for row in cx.execute('SELECT id FROM findings WHERE run_id=?',
+                                                       (run['id'],)) if row['id'] not in current_ids]
+            for finding_id in obsolete:
+                cx.execute('DELETE FROM reviews WHERE finding_id=?', (finding_id,))
+                cx.execute('DELETE FROM findings WHERE id=? AND run_id=?', (finding_id, run['id']))
 
     def run(self, run_id: str) -> dict:
         with self.connection() as cx:
@@ -176,6 +194,8 @@ class Store:
     def review(self, run_id: str, finding_id: str, status: str, note: str) -> dict:
         if status not in {'confirmed', 'needs_clarification', 'rejected', 'unreviewed'}:
             raise ValueError('Unknown review status')
+        if len(note) > 5000:
+            raise ValueError('Review note exceeds 5000 characters.')
         with self.connection() as cx:
             cx.execute('BEGIN IMMEDIATE')
             if not cx.execute('SELECT id FROM findings WHERE id=? AND run_id=?', (finding_id, run_id)).fetchone():
@@ -183,9 +203,12 @@ class Store:
             run = json.loads(cx.execute('SELECT payload FROM runs WHERE id=?', (run_id,)).fetchone()['payload'])
             if run['state'] in {'queued', 'running'}:
                 raise ValueError('Wait until the run stops before reviewing.')
+            previous = cx.execute('SELECT status,note FROM reviews WHERE finding_id=?', (finding_id,)).fetchone()
+            if previous and (previous['status'], previous['note']) == (status, note):
+                return {'finding_id': finding_id, 'status': status, 'review_revision': run['review_revision']}
             cx.execute('''INSERT INTO reviews VALUES (?, ?, ?, ?) ON CONFLICT(finding_id)
                 DO UPDATE SET status=excluded.status,note=excluded.note,updated_at=excluded.updated_at''',
-                       (finding_id, status, note[:5000], now()))
+                       (finding_id, status, note, now()))
             run['review_revision'] += 1
             cx.execute('UPDATE runs SET payload=? WHERE id=?', (encode(run), run_id))
         return {'finding_id': finding_id, 'status': status, 'review_revision': run['review_revision']}
@@ -202,6 +225,7 @@ class Store:
             current = cx.execute('SELECT payload FROM runs WHERE id=?', (run_id,)).fetchone()
             if current is None or json.loads(current['payload'])['review_revision'] != revision:
                 raise ValueError('Review changed during translation; request a fresh translation.')
+            validate_translation(json.loads(current['payload']), locale, payload)
             cx.execute('INSERT OR REPLACE INTO translations VALUES (?, ?, ?, ?)',
                        (run_id, revision, locale, encode(payload)))
 
@@ -211,6 +235,23 @@ class Store:
             for row in rows:
                 run = json.loads(row['payload'])
                 run.update(state='interrupted', stage='interrupted', finished_at=now())
-                run['errors'].append('Previous process stopped before completion; create a new analysis to retry.')
+                run['errors'].append('Previous process stopped before completion; accepted checkpoints retained. Resume this run or create a new analysis.')
                 cx.execute('UPDATE runs SET state=?,payload=? WHERE id=?', ('interrupted', encode(run), run['id']))
         return len(rows)
+
+
+def validate_translation(run: dict, locale: str, payload: dict) -> None:
+    """A cached translation may replace prose only, never identities or sources."""
+    if locale not in {'ru', 'kk', 'en'} or payload.get('locale') != locale:
+        raise ValueError('Translation locale does not match the requested language.')
+    for collection, fields in (('findings', {'id', 'title', 'explanation', 'recommendation'}),
+                               ('structure', {'id', 'explanation'})):
+        items = payload.get(collection, [])
+        expected = {item['id'] for item in run.get(collection, [])}
+        if not isinstance(items, list) or any(not isinstance(item, dict) or set(item) != fields
+                                              or any(not isinstance(value, str) for value in item.values())
+                                              for item in items):
+            raise ValueError(f'Translation has invalid {collection} fields.')
+        actual = [item['id'] for item in items]
+        if len(actual) != len(expected) or set(actual) != expected:
+            raise ValueError(f'Translation changed {collection} IDs.')
