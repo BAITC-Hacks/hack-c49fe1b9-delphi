@@ -1,0 +1,20 @@
+{
+  "synthetic": true,
+  "description": "Illustrative Delphi workload. Token counts and call counts are assumptions, not measurements.",
+  "defaults": {"provider": "openrouter", "model": "openai/gpt-4.1-mini"},
+  "actions": [
+    {"action": "extract_functions", "calls": 8, "input_tokens": 6000, "output_tokens": 1800},
+    {"action": "match_functions", "calls": 4, "input_tokens": 10000, "output_tokens": 2000},
+    {"action": "check_unmatched_after", "calls": 2, "input_tokens": 8000, "output_tokens": 1200},
+    {"action": "check_duplicates_conflicts", "calls": 2, "input_tokens": 10000, "output_tokens": 1800},
+    {"action": "agent_tool_round", "calls": 4, "input_tokens": 12000, "cached_tokens": 6000, "output_tokens": 1000},
+    {"action": "validate_findings", "calls": 1, "input_tokens": 6000, "output_tokens": 1200},
+    {"action": "generate_summary", "calls": 1, "input_tokens": 5000, "output_tokens": 1500},
+    {"action": "translate_kk", "calls": 1, "input_tokens": 3000, "output_tokens": 3000},
+    {"action": "translate_en", "calls": 1, "input_tokens": 3000, "output_tokens": 3000},
+    {"action": "search_clauses", "provider": "local", "model": "local", "calls": 4},
+    {"action": "get_clause", "provider": "local", "model": "local", "calls": 8},
+    {"action": "get_unit_functions", "provider": "local", "model": "local", "calls": 2},
+    {"action": "check_references", "provider": "local", "model": "local", "calls": 2}
+  ]
+}
