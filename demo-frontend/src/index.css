@@ -1,0 +1,141 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Delphi tokens — single source: docs/design/DESIGN.md §2 */
+:root {
+  --radius: 0.5rem;
+
+  --background: hsl(210 20% 98%);
+  --foreground: hsl(222 47% 11%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(222 47% 11%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(222 47% 11%);
+  --primary: hsl(221 63% 33%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(214 32% 91%);
+  --secondary-foreground: hsl(222 47% 11%);
+  --muted: hsl(214 32% 94%);
+  --muted-foreground: hsl(215 16% 40%);
+  --accent: hsl(214 32% 91%);
+  --accent-foreground: hsl(222 47% 11%);
+  --destructive: hsl(0 72% 51%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(214 32% 88%);
+  --input: hsl(214 32% 88%);
+  --ring: hsl(221 63% 33%);
+
+  /* function / unit / risk statuses */
+  --status-kept-bg: hsl(215 20% 95%);
+  --status-kept-fg: hsl(215 25% 30%);
+  --status-reworded-bg: hsl(214 95% 94%);
+  --status-reworded-fg: hsl(221 70% 35%);
+  --status-transferred-bg: hsl(262 83% 95%);
+  --status-transferred-fg: hsl(262 60% 40%);
+  --status-split-bg: hsl(173 60% 92%);
+  --status-split-fg: hsl(175 60% 25%);
+  --status-missing-bg: hsl(43 96% 90%);
+  --status-missing-fg: hsl(30 80% 30%);
+  --status-duplicate-bg: hsl(24 95% 92%);
+  --status-duplicate-fg: hsl(20 80% 32%);
+  --status-conflict-bg: hsl(350 85% 94%);
+  --status-conflict-fg: hsl(345 65% 35%);
+  --status-new-bg: hsl(142 70% 92%);
+  --status-new-fg: hsl(142 60% 25%);
+
+  --evidence-highlight: hsl(48 100% 85%);
+  --evidence-highlight-strong: hsl(48 100% 70%);
+}
+
+@theme inline {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-status-kept-bg: var(--status-kept-bg);
+  --color-status-kept-fg: var(--status-kept-fg);
+  --color-status-reworded-bg: var(--status-reworded-bg);
+  --color-status-reworded-fg: var(--status-reworded-fg);
+  --color-status-transferred-bg: var(--status-transferred-bg);
+  --color-status-transferred-fg: var(--status-transferred-fg);
+  --color-status-split-bg: var(--status-split-bg);
+  --color-status-split-fg: var(--status-split-fg);
+  --color-status-missing-bg: var(--status-missing-bg);
+  --color-status-missing-fg: var(--status-missing-fg);
+  --color-status-duplicate-bg: var(--status-duplicate-bg);
+  --color-status-duplicate-fg: var(--status-duplicate-fg);
+  --color-status-conflict-bg: var(--status-conflict-bg);
+  --color-status-conflict-fg: var(--status-conflict-fg);
+  --color-status-new-bg: var(--status-new-bg);
+  --color-status-new-fg: var(--status-new-fg);
+
+  --color-evidence-highlight: var(--evidence-highlight);
+
+  /* Motion rule 2 (DESIGN.md §7): cited fragment pulses once when the drawer opens */
+  --animate-evidence-pulse: evidence-pulse 600ms ease-out 2;
+  @keyframes evidence-pulse {
+    0% { background-color: var(--evidence-highlight); }
+    50% { background-color: var(--evidence-highlight-strong); }
+    100% { background-color: var(--evidence-highlight); }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply antialiased;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+}
