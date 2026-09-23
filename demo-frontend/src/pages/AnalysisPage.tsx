@@ -1,7 +1,7 @@
 import { reviewQueue, riskSummary } from "@/lib/evidence";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { AlertTriangle, ShieldCheck } from "lucide-react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { AlertTriangle, ListChecks, ShieldCheck } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +16,7 @@ import { StatusChip } from "@/components/StatusChip";
 import { TracePanel } from "@/components/TracePanel";
 import { UnitTable } from "@/components/UnitTable";
 import { useAnalysis } from "@/hooks/useAnalysis";
+import { buildQueue } from "@/hooks/useReviewQueue";
 import { DEMO_ID, saveReview } from "@/lib/api";
 import { plural } from "@/lib/adapter";
 import { UNIT_STATUS } from "@/lib/status";
@@ -38,6 +39,12 @@ export default function AnalysisPage() {
     const next = await saveReview(id, findingId, status, note);
     if (next) replace(next);
   };
+
+  /** Questions still waiting for a human decision: the entry into the review queue. */
+  const openQuestions = useMemo(
+    () => (data ? buildQueue(data).filter((i) => i.question && i.review.status === "unreviewed").length : 0),
+    [data],
+  );
 
   const unitCounts = useMemo(() => {
     const counts: Partial<Record<UnitStatus, number>> = {};
@@ -116,7 +123,13 @@ export default function AnalysisPage() {
               {missingCount > 0 && ` · ${missingCount} без найденного соответствия`}
             </p>
           </div>
-          <div className="no-print">
+          <div className="no-print flex flex-wrap gap-2">
+            <Button asChild size="sm" className="gap-1.5">
+              <Link to={`/analyses/${encodeURIComponent(id ?? DEMO_ID)}/review`}>
+                <ListChecks className="size-4" aria-hidden="true" />
+                {openQuestions > 0 ? `Проверить выводы (${openQuestions})` : "Очередь проверки"}
+              </Link>
+            </Button>
             <ExportMenu result={data} />
           </div>
         </div>

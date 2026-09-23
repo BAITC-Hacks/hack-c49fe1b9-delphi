@@ -1,20 +1,23 @@
 import { useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { AnalysisResult, ClauseRef, FunctionStatus, Review, ReviewStatus, RiskKind, RiskSide } from "@/types";
+import { functionEvidence, riskEvidence, uniqueRefs } from "@/lib/evidence";
+import type { AnalysisResult, ClauseRef, FunctionStatus, Review, ReviewStatus } from "@/types";
 
 /**
  * Review queue (main screen): every finding a human has to decide on, most urgent first.
  * One item per finding — a finding that is both a function row and a risk card appears once, as the risk.
+ * Evidence comes from the same helpers as the evidence drawer (lib/evidence.ts), so both show the same quotes.
  * Filter, review scope and the selected item live in the URL, so reload and deep links keep the place.
  */
 
-export type QueueStatus = FunctionStatus | RiskKind;
 export type ReviewScope = "unreviewed" | "all" | Exclude<ReviewStatus, "unreviewed">;
+export type QueueKind = "function" | "risk" | "unit";
 
 export interface QueueItem {
   id: string;
-  kind: "function" | "risk";
-  status: QueueStatus;
+  kind: QueueKind;
+  /** FunctionStatus, RiskKind or UnitStatus, depending on `kind`. */
+  status: string;
   /** Function-map status of a risk that sits on a mapped function (same finding). */
   secondary?: FunctionStatus;
   title: string;
@@ -23,6 +26,8 @@ export interface QueueItem {
   question: boolean;
   before: ClauseRef[];
   after: ClauseRef[];
+  context: ClauseRef[];
+  evidenceError?: string;
   fromUnits: string[];
   toUnits: string[];
   explanation?: string;
@@ -46,6 +51,7 @@ const PRIORITY: Record<string, number> = {
   unclear: 9,
   reference: 10,
   reworded: 11,
+  structure: 12,
   kept: 20,
   new: 21,
 };
@@ -53,14 +59,10 @@ const PRIORITY: Record<string, number> = {
 const UNREVIEWED: Review = { status: "unreviewed" };
 
 export function buildQueue(result: AnalysisResult, overrides: Record<string, Review> = {}): QueueItem[] {
-  // Side of a reference without an explicit side (offline demo): by the documents the function map uses.
-  const beforeDocs = new Set(result.functions.flatMap((f) => (f.before ? [f.before.ref.document_id] : [])));
-  const sideOf = (ref: ClauseRef, fallback: "before" | "after") =>
-    ref.side ?? (beforeDocs.has(ref.document_id) ? "before" : beforeDocs.size ? "after" : fallback);
-
   const items = new Map<string, QueueItem>();
   for (const f of result.functions) {
-    const incomplete = f.status === "missing" && !!f.search && !f.search.includes("полный: да");
+    const ev = functionEvidence(f);
+    const incomplete = f.status === "missing" && !!f.search && !f.search.complete;
     items.set(f.id, {
       id: f.id,
       kind: "function",
@@ -68,23 +70,24 @@ export function buildQueue(result: AnalysisResult, overrides: Record<string, Rev
       title: f.title,
       priority: PRIORITY[incomplete ? "missing:incomplete" : f.status] ?? 15,
       question: f.status !== "kept" && f.status !== "new",
-      before: f.before ? [f.before.ref] : [],
-      after: (f.after ?? []).map((a) => a.ref),
-      fromUnits: f.before ? [f.before.unit] : [],
-      toUnits: (f.after ?? []).map((a) => a.unit),
+      before: ev.before ?? [],
+      after: ev.after ?? [],
+      context: ev.context ?? [],
+      evidenceError: ev.error,
+      fromUnits: f.before.map((s) => s.unit),
+      toUnits: f.after.map((s) => s.unit),
       explanation: f.note,
       recommendation: f.recommendation,
-      search: f.search,
+      search: f.search?.text,
       searchIncomplete: incomplete,
       review: overrides[f.id] ?? f.review ?? UNREVIEWED,
     });
   }
   for (const r of result.risks) {
     const base = items.get(r.id);
-    const sides: RiskSide[] = r.a.ref.clause_id === r.b.ref.clause_id ? [r.a] : [r.a, r.b];
-    const riskBefore = sides.filter((s, i) => sideOf(s.ref, i === 0 ? "before" : "after") === "before");
-    const riskAfter = sides.filter((s, i) => sideOf(s.ref, i === 0 ? "before" : "after") === "after");
-    const unique = (refs: ClauseRef[]) => refs.filter((x, i) => refs.findIndex((y) => y.clause_id === x.clause_id) === i);
+    const ev = riskEvidence(r);
+    const unitsOn = (side: "before" | "after") => r.sides.filter((s) => s.refs.some((ref) => ref.side === side)).map((s) => s.unit);
+    const riskAfterUnits = unitsOn("after");
     items.set(r.id, {
       id: r.id,
       kind: "risk",
@@ -93,15 +96,38 @@ export function buildQueue(result: AnalysisResult, overrides: Record<string, Rev
       title: r.title,
       priority: PRIORITY[r.kind] ?? 9,
       question: true,
-      before: unique([...(base?.before ?? []), ...riskBefore.map((s) => s.ref)]),
-      after: unique(riskAfter.map((s) => s.ref)),
-      fromUnits: base?.fromUnits.length ? base.fromUnits : riskBefore.map((s) => s.unit),
-      toUnits: riskAfter.map((s) => s.unit),
+      before: uniqueRefs([...(base?.before ?? []), ...(ev.before ?? [])]),
+      after: uniqueRefs([...(ev.after ?? []), ...(base?.after ?? [])]),
+      context: uniqueRefs([...(base?.context ?? []), ...(ev.context ?? [])]),
+      evidenceError: ev.error ?? base?.evidenceError,
+      fromUnits: base?.fromUnits.length ? base.fromUnits : unitsOn("before"),
+      toUnits: riskAfterUnits.length ? riskAfterUnits : base?.toUnits ?? [],
       explanation: r.why,
       recommendation: r.check,
       search: base?.search,
       searchIncomplete: base?.searchIncomplete ?? false,
       review: overrides[r.id] ?? r.review ?? base?.review ?? UNREVIEWED,
+    });
+  }
+  for (const s of result.structureFindings ?? []) {
+    if (!s.finding_id || items.has(s.finding_id)) continue;
+    items.set(s.finding_id, {
+      id: s.finding_id,
+      kind: "unit",
+      status: s.status ?? "changed",
+      title: s.title,
+      priority: PRIORITY.structure,
+      question: true,
+      before: s.before ?? [],
+      after: s.after ?? [],
+      context: s.context ?? [],
+      evidenceError: s.error,
+      fromUnits: [],
+      toUnits: [],
+      explanation: s.note,
+      recommendation: s.recommendation,
+      searchIncomplete: false,
+      review: overrides[s.finding_id] ?? s.review ?? UNREVIEWED,
     });
   }
   return [...items.values()].sort((a, b) => a.priority - b.priority || a.title.localeCompare(b.title, "ru"));
@@ -129,7 +155,12 @@ export function useReviewQueue(items: QueueItem[]) {
   const questions = items.filter((i) => i.question);
   const reviewedCount = questions.filter((i) => i.review.status !== "unreviewed").length;
   const quietCount = items.length - questions.length;
-  const presentStatuses = useMemo(() => [...new Set(items.filter((i) => i.question || withQuiet).map((i) => i.status))], [items, withQuiet]);
+  /** Status → chip kind, in queue order, for the filter row. */
+  const presentStatuses = useMemo(() => {
+    const kinds = new Map<string, QueueKind>();
+    items.filter((i) => i.question || withQuiet).forEach((i) => kinds.has(i.status) || kinds.set(i.status, i.kind));
+    return [...kinds].map(([status, kind]) => ({ status, kind }));
+  }, [items, withQuiet]);
 
   const wanted = params.get("f");
   const selected = visible.find((i) => i.id === wanted) ?? visible[0];

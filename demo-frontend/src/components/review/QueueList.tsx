@@ -4,9 +4,8 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
 import { ReviewChip } from "@/components/ReviewControls";
 import { StatusChip } from "@/components/StatusChip";
-import { metaFor } from "@/lib/status";
 import { cn } from "@/lib/utils";
-import type { QueueItem, ReviewScope } from "@/hooks/useReviewQueue";
+import type { QueueItem, QueueKind, ReviewScope } from "@/hooks/useReviewQueue";
 
 const SCOPE_LABELS: [ReviewScope, string][] = [
   ["unreviewed", "Непроверенные"],
@@ -21,8 +20,10 @@ interface Props {
   selectedId?: string;
   scope: ReviewScope;
   statuses: Set<string>;
-  presentStatuses: string[];
+  presentStatuses: { status: string; kind: QueueKind }[];
   quietCount: number;
+  /** result.coverage.complete; absent means completeness is not confirmed. */
+  coverageComplete: boolean;
   withQuiet: boolean;
   onSelect(id: string): void;
   onScope(scope: ReviewScope): void;
@@ -31,11 +32,10 @@ interface Props {
   onReset(): void;
 }
 
-const kindOf = (s: string) => (metaFor("risk", s) && !metaFor("function", s) ? "risk" : "function");
-
 /** Left pane: the questions, most urgent first. Selection scrolls into view so the place is never lost. */
 export function QueueList(props: Props) {
-  const { items, selectedId, scope, statuses, presentStatuses, quietCount, withQuiet } = props;
+  const { items, selectedId, scope, statuses, presentStatuses, quietCount, withQuiet, coverageComplete } = props;
+  const allDone = scope === "unreviewed" && statuses.size === 0;
   const listRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
@@ -66,15 +66,15 @@ export function QueueList(props: Props) {
         {presentStatuses.length > 1 && (
           <div className="flex flex-wrap items-center gap-1" aria-label="Фильтр по типу изменения">
             <ListFilter className="size-3.5 text-muted-foreground" aria-hidden="true" />
-            {presentStatuses.map((s) => (
+            {presentStatuses.map(({ status, kind }) => (
               <button
-                key={s}
+                key={status}
                 type="button"
-                aria-pressed={statuses.has(s)}
-                onClick={() => props.onToggleStatus(s)}
-                className={cn("rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring", !statuses.has(s) && statuses.size > 0 && "opacity-50")}
+                aria-pressed={statuses.has(status)}
+                onClick={() => props.onToggleStatus(status)}
+                className={cn("rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring", !statuses.has(status) && statuses.size > 0 && "opacity-50")}
               >
-                <StatusChip status={s} kind={kindOf(s)} />
+                <StatusChip status={status} kind={kind} />
               </button>
             ))}
           </div>
@@ -84,8 +84,14 @@ export function QueueList(props: Props) {
       {items.length === 0 ? (
         <EmptyState
           icon={ListFilter}
-          title={scope === "unreviewed" && statuses.size === 0 ? "Все вопросы проверены" : "По фильтру ничего нет"}
-          description={scope === "unreviewed" && statuses.size === 0 ? "Решения сохранены и уже учтены в заключении." : undefined}
+          title={allDone ? "Непроверенных вопросов нет" : "По фильтру ничего нет"}
+          description={
+            allDone
+              ? coverageComplete
+                ? "Решения сохранены и учтены в заключении."
+                : "Решения сохранены. Полнота проверки комплекта не подтверждена — смотрите «Ограничения» в заключении."
+              : undefined
+          }
           action={
             <Button size="sm" variant="outline" onClick={props.onReset}>
               Показать все

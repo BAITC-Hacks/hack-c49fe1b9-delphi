@@ -134,6 +134,7 @@ export default function ReviewQueuePage() {
               presentStatuses={q.presentStatuses}
               quietCount={q.quietCount}
               withQuiet={q.withQuiet}
+              coverageComplete={data.coverage?.complete === true}
               onSelect={(itemId) => {
                 q.select(itemId);
                 setMobileDetail(true);
