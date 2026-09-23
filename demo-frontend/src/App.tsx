@@ -4,6 +4,7 @@ import HistoryPage from "@/pages/HistoryPage";
 import UploadPage from "@/pages/UploadPage";
 import ProgressPage from "@/pages/ProgressPage";
 import AnalysisPage from "@/pages/AnalysisPage";
+import ReviewQueuePage from "@/pages/ReviewQueuePage";
 
 function LegacyAnalysisRedirect() {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="/new" element={<UploadPage />} />
         <Route path="/runs/:runId" element={<ProgressPage />} />
         <Route path="/analyses/:id" element={<AnalysisPage />} />
+        <Route path="/analyses/:id/review" element={<ReviewQueuePage />} />
         <Route path="/analysis/:id" element={<LegacyAnalysisRedirect />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
