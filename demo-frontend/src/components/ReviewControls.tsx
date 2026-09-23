@@ -104,7 +104,7 @@ export function ReviewControls({ findingId, review, onSave, canConfirm = true }:
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Отметка сохраняется на сервере и попадает в заключение и экспорт. Сам вывод ИИ не меняется.
+        Отметка попадает в заключение и экспорт. Сам вывод ИИ не меняется.
       </p>
     </section>
   );

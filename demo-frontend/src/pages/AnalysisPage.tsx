@@ -190,7 +190,14 @@ export default function AnalysisPage() {
           </TabsContent>
         </Tabs>
 
-        <TracePanel trace={data.trace} />
+        <TracePanel
+          trace={data.trace}
+          note={
+            data.mode === "live" || data.mode === "partial"
+              ? undefined
+              : "Пример того, как агент проходит стадии и вызывает инструменты. Это не запись живого запуска: в демо модель не вызывается, числа и время условные."
+          }
+        />
       </div>
 
       <EvidenceDrawer
