@@ -2,6 +2,8 @@
 
 Для нового чата (Opus 5.5). Порядок чтения: этот файл целиком → `backend/openapi.json` (истина по API) → `demo-frontend/README.md` → `docs/product.md` → `docs/design/SCENARIOS.md`. Дедлайн 18:00, фриз фич 17:00. Часы репозитория и `date` совпадают; ориентируйся на `date`.
 
+> **Статус на 16:20:** §3 выполнен в ветке `nurdaulet-api-integration` (адаптер `demo-frontend/src/lib/adapter.ts`, проверка человеком). Проверено на реальном бэкенде без ключа ИИ; живой прогон с моделью — первым делом, как только в `backend/.env` будет `OPENAI_API_KEY` + `OPENAI_MODEL`. Осталось Осману: `StaticFiles` для `demo-frontend/dist` (§2).
+
 **Ветка фронта:** `nurdaulet-design-features-update` → PR #1 в `main` (https://github.com/BAITC-Hacks/hack-c49fe1b9-delphi/pull/1). Ветка создана поверх коммитов бэкенда `0dc0689` и `56b6c5b`, конфликтов с `main` нет.
 
 ---
