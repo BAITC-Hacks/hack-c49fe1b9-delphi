@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from .common import Locale, Side
 
@@ -35,6 +35,8 @@ class RunCoverage(BaseModel):
     reviewed_structure_units: int
     unprocessed_source_ids: list[UUID]
     unreviewed_function_ids: list[UUID]
+    classified_after_functions: int = 0
+    unclassified_after_function_ids: list[UUID] = Field(default_factory=list)
 
 
 class RunAccepted(BaseModel):
@@ -95,6 +97,7 @@ class RunResponse(BaseModel):
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    resume_available: bool = False
 
 
 class RunDetail(RunResponse):

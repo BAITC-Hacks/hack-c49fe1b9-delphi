@@ -20,15 +20,17 @@ interface Props {
   counters?: Record<string, number>;
   onCancel(): void;
   onRetryStage?(): void;
+  /** Replaces the default duration hint, e.g. for a replayed example. */
+  hint?: string;
 }
 
-export function AnalysisProgress({ stage, stageState, counters = {}, onCancel, onRetryStage }: Props) {
+export function AnalysisProgress({ stage, stageState, counters = {}, onCancel, onRetryStage, hint }: Props) {
   const failed = stageState === "failed" || stageState === "interrupted";
   const done = stageState === "done" ? stage : stage - 1;
   const value = Math.min(100, Math.round(((done + (stageState === "running" ? 0.5 : 0)) / STAGES.length) * 100));
   const statusText =
     stageState === "interrupted"
-      ? `Анализ прерван на стадии ${stage} «${STAGES[stage - 1]}» (сервер перезапускался). Повторите стадию`
+      ? `Анализ прерван на стадии ${stage} «${STAGES[stage - 1]}» (сервер перезапускался). Повторите анализ`
       : stageState === "failed"
         ? `Стадия ${stage} «${STAGES[stage - 1]}» не завершена`
         : `Стадия ${stage} из ${STAGES.length}: ${STAGES[stage - 1]}`;
@@ -37,7 +39,9 @@ export function AnalysisProgress({ stage, stageState, counters = {}, onCancel, o
     <Card className="mx-auto w-full max-w-2xl">
       <CardHeader>
         <CardTitle className="text-lg">Анализ комплектов</CardTitle>
-        <p className="text-sm text-muted-foreground">Обычно 2–4 минуты. Можно оставить вкладку открытой.</p>
+        <p className="text-sm text-muted-foreground">
+          {hint ?? "Обычно 2–4 минуты. Анализ идёт на сервере — можно вернуться к истории и открыть его позже."}
+        </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
         <ol className="flex flex-col gap-3">
@@ -81,7 +85,7 @@ export function AnalysisProgress({ stage, stageState, counters = {}, onCancel, o
                   )}
                   {isFailed && onRetryStage && (
                     <Button size="sm" variant="outline" className="mt-2" onClick={onRetryStage}>
-                      Повторить стадию
+                      Повторить анализ
                     </Button>
                   )}
                 </div>
@@ -99,7 +103,7 @@ export function AnalysisProgress({ stage, stageState, counters = {}, onCancel, o
 
         <div className="flex justify-end">
           <Button variant="ghost" size="sm" onClick={onCancel}>
-            Отменить
+            К истории
           </Button>
         </div>
       </CardContent>

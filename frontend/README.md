@@ -4,21 +4,56 @@ Next.js App Router + TypeScript, Better Auth, TanStack Query, generated HeyAPI,
 React Hook Form/Zod and official shadcn components. Feature modules own their
 forms, queries and screens; route files stay small.
 
+Phase 1 lab integration is connected to the existing frontend: saved-run
+continuation, Before/After source-search coverage and translated structure
+explanations use the generated backend contract. Phase 2 now adapts the latest
+`demo-frontend` design to this connected application. Only the demo directory was
+refreshed from `origin/main` to `231811e`; its design code is unchanged from
+`45b3372`. No demo fixtures, demo transport or offline mode were copied into the
+product. Navy/white tokens, bundled Inter and JetBrains Mono, top navigation,
+history, real Before/After drop zones and the results workspace share one style.
+
 ## Working MVP
 
 - `/sign-in`, `/sign-up`: email/password authentication and persistent sessions.
-- `/`: saved comparisons, search, status filters and repeat as a new draft.
+- `/`: compact saved comparisons, search, status filters, pagination and repeat as a new draft.
 - `/new?analysis=<id>`: draft creation, multiple Before/After uploads, revision
   labels, moving/deleting documents, parsing warnings and exact source previews.
+  Keyboard-accessible drop zones support real drag-and-drop and file selection.
 - `/analyses/<id>`: run polling, coverage, structure, findings, evidence, human
   review notes, report preview/print/HTML download and function CSV export.
+  Summary tiles filter the saved findings. Queue and table views share URL state;
+  the queue advances to the next unreviewed finding after a saved decision.
+  A linked finding stays selected even when queue filters exclude it; unknown
+  finding IDs show an error. Copied finding links clear filters and source selection.
+  Responsive tabs and filters keep the analysis usable on narrow screens;
+  the coverage summary exposes saved limitations even when collapsed.
+  Before/After evidence preserves all sources, many-to-many groups and context.
+  Stopped runs show their saved findings and source evidence. When the backend
+  reports that continuation is available, **Continue analysis** resumes saved
+  progress with the same input documents. **Repeat in a new draft** creates a
+  separate comparison. Saving a human review decision or note prevents resume.
 - RU/KK/EN UI, mobile navigation and a notification bell showing real actions.
   Notifications are in memory for the current tab and clear on sign-out.
 
 UI language and analysis output language are separate. Switching UI language
 never reruns an analysis or automatically calls AI. Translation of saved
-explanations requires an explicit action; source quotes and review notes stay
-unchanged.
+finding and structure explanations requires an explicit action; original unit
+names, source quotes and review notes stay unchanged. Evidence search shows
+whether the Before or After document set was checked. Coverage distinguishes
+After risk checks from verification of the origin of After functions. Source views
+show readable document positions and the saved parent-context chain; sources
+outside the current comparison are rejected in the results panel.
+
+Evidence highlighting checks Python Unicode code-point offsets against the exact
+saved excerpt before converting to JavaScript UTF-16. Invalid bounds display the
+full original block with a warning; no approximate phrase match is substituted.
+Long clauses can expand, with their saved parent context available. Local word
+differences are available only for an unambiguous one-function/one-source pair
+on each side; split/merge and overlap/conflict groups are excluded. The LCS is
+bounded to 600 word/whitespace tokens and 60,000 UTF-16 units per side. Larger
+inputs keep their original quotations with an explicit limit message. This is
+passage comparison, not complete document alignment or a document editor.
 
 ## Local setup
 
@@ -109,6 +144,36 @@ one draft, two official DOCX documents and 966 exact source blocks. Both files
 have parsing limitations, visible in the editor and requiring explicit consent
 for a partial analysis.
 
+The Phase 1 lab integration passed lint, typecheck and build without a new
+browser/E2E/live run. The Phase 2 design transfer separately passed:
+
+- `npm run lint`, `npm run typecheck`, `npm run build`.
+- `node --experimental-strip-types --test tests/unit/*.test.mjs`: **16/16**
+  evidence/queue checks passed using Node.js 24.
+- Four visual captures of real history/new-draft pages at two widths.
+- Synthetic result summary/review at 1440 and 390 px, plus word differences:
+  no horizontal overflow, page errors or unhandled requests were found.
+
+Current visual artifacts are local: `/tmp/delphi-design-phase2` for real pages and
+`/tmp/delphi-analysis-design` for synthetic result views. Synthetic data was used
+only by the verification harness, not added as a product demo mode. This was a
+focused UI check, not a full analysis pipeline E2E or live AI-quality test.
+
+Final analysis-page polish also passed lint, typecheck and build, followed by
+**10/10** focused Playwright checks:
+
+```sh
+npm run test:report -- tests/e2e/results.spec.ts tests/e2e/mobile.spec.ts
+```
+
+The regenerated [browser report](docs/report/latest.md) covers structure/source
+navigation, finding filters and links, review persistence, HTML/CSV exports,
+explicit translation, stopped runs, and mobile navigation. Result data and
+translations are synthetic fixtures with real frontend authentication. The
+mobile history check covers the shell and does not establish backend availability
+or saved-history correctness. This run does not validate live AI quality or the
+complete upload-to-analysis pipeline.
+
 ## Browser tests and page report
 
 With the backend running and both databases seeded:
@@ -125,7 +190,7 @@ descriptions and links to screenshots in `docs/report/screenshots/<run-id>/`.
 The command fails when a browser assertion fails. Instructions and scope:
 [report README](docs/report/README.md).
 
-Live AI analysis/translation quality remains a separate Phase 2 check. Set
+Live AI analysis/translation quality still requires a separately requested check. Set
 `OPENAI_API_KEY` and `OPENAI_MODEL` on the backend for AI operations; without
 them, preparation works and the UI shows an explicit configuration notice.
-Phase 3 remains the separate demo-frontend design.
+The existing browser-report workflow above remains available for future validation.

@@ -121,7 +121,7 @@ class UnitDraft(Contract):
 
 
 class FunctionDraft(Contract):
-    owner_keys: list[str] = Field(min_length=1)
+    owner_keys: list[str]
     actor_original: str
     action: str
     object: str
@@ -168,3 +168,7 @@ class MissingSearch(Contract):
 
 class AgentError(Exception):
     pass
+
+
+class OutputLimit(AgentError):
+    """An unaccepted provider response exhausted its output token allowance."""

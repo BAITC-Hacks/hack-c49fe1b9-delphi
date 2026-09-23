@@ -75,7 +75,23 @@ def response(parsed=None, output=None, status="completed"):
 
 def engine(mock=None, rounds=2):
     parse = mock or AsyncMock()
-    client = SimpleNamespace(responses=SimpleNamespace(parse=parse))
+
+    async def raw_parse(**kwargs):
+        value = await parse(**kwargs)
+        details = getattr(value, "incomplete_details", None)
+        envelope = {
+            "status": value.status,
+            "incomplete_details": (
+                details if isinstance(details, dict) else {"reason": getattr(details, "reason", None)}
+            ),
+        }
+        return SimpleNamespace(
+            http_response=SimpleNamespace(json=lambda: envelope), parse=lambda: value
+        )
+
+    client = SimpleNamespace(
+        responses=SimpleNamespace(with_raw_response=SimpleNamespace(parse=raw_parse))
+    )
     return AnalysisEngine(client, "test-model", 5, rounds, 16000)
 
 

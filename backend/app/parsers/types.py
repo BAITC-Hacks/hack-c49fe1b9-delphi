@@ -32,3 +32,7 @@ class TextChunk:
     key: str
     text: str
     locator: dict[str, Any]
+    heading: bool = False
+    toc: bool = False
+    clause_numbers: bool = True
+    context_key: str | None = None

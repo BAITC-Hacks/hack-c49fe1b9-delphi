@@ -23,6 +23,7 @@ def validate_finding(
             raise AgentError("Finding cites unknown, repeated or wrong-side functions")
     evidence: list[EvidenceOutput] = []
     evidence_ids: set[str] = set()
+    evidence_keys = set()
     for item in draft.evidence:
         source = sources.get(item.source_id)
         if source is None:
@@ -34,8 +35,13 @@ def validate_finding(
             raise AgentError("Evidence offsets must be supplied together")
         if start is not None and end is not None and not (0 <= start < end <= len(source.text)):
             raise AgentError("Evidence offsets are outside the source text")
+        key = (source.id, item.evidence_role, start, end)
+        if key in evidence_keys:
+            raise AgentError("Finding repeats an evidence reference")
+        evidence_keys.add(key)
         evidence.append(EvidenceOutput(**item.model_dump()))
-        evidence_ids.add(source.id)
+        if item.evidence_role != "context":
+            evidence_ids.add(source.id)
     linked = draft.before_function_ids + draft.after_function_ids
     if any(
         not set(functions[function_id].source_ids).intersection(evidence_ids)
@@ -58,9 +64,13 @@ def validate_finding(
         not draft.before_function_ids or draft.after_function_ids
     ):
         raise AgentError("Missing candidate must have only Before function IDs")
-    if draft.change_type == "split" and len(draft.after_function_ids) < 2:
+    if draft.change_type == "split" and (
+        len(draft.before_function_ids) != 1 or len(draft.after_function_ids) < 2
+    ):
         raise AgentError("Split requires multiple After functions")
-    if draft.change_type == "merged" and len(draft.before_function_ids) < 2:
+    if draft.change_type == "merged" and (
+        len(draft.after_function_ids) != 1 or len(draft.before_function_ids) < 2
+    ):
         raise AgentError("Merge requires multiple Before functions")
     if draft.issue_type in {"overlap", "potential_conflict"}:
         after_sources = {

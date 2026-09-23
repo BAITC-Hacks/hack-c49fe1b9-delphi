@@ -1,271 +1,153 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Copy, X } from "lucide-react";
-import { useEffect, useRef } from "react";
-import { Badge } from "@/components/ui/badge";
+import { ArrowRight, Copy, GitCompareArrows, SearchX, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { FindingStatusBadge } from "@/components/custom-ui/finding-status-badge";
 import { Button } from "@/components/ui/button";
-import type {
-  FindingResponse,
-  FunctionResponse,
-  TranslatedFinding,
-} from "@/shared/api/generated";
+import type { DocumentResponse, FindingResponse, FunctionResponse, TranslatedFinding } from "@/shared/api/generated";
 import { useI18n } from "@/shared/i18n";
 import { toast } from "@/shared/notifications";
 import { resultsApi } from "../api/results-api";
-import { changeLabel, issueLabel } from "../model/labels";
+import { comparisonPair, groupEvidence } from "../model/evidence";
+import { reviewLabel } from "../model/labels";
+import { EvidenceCard } from "./evidence-card";
 import { RequestError } from "./request-error";
 import { ReviewForm } from "./review-form";
+import { WordDiff } from "./word-diff";
 
 export function FindingDetail({
-  finding,
-  functions,
-  translation,
-  analysisId,
-  onSource,
-  onClose,
+  finding, functions, translation, analysisId, documents = [], canReview = true,
+  reviewDisabled = false, autoFocus = true, onSource, onClose, onReviewSaved,
 }: {
   finding: FindingResponse;
   functions: FunctionResponse[];
   translation?: TranslatedFinding;
   analysisId: string;
+  documents?: DocumentResponse[];
+  canReview?: boolean;
+  reviewDisabled?: boolean;
+  autoFocus?: boolean;
   onSource: (id: string) => void;
   onClose: () => void;
+  onReviewSaved?: (findingId: string) => void;
 }) {
   const { t } = useI18n();
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    heading.current?.focus();
-  }, [finding.id]);
+    if (autoFocus) heading.current?.focus();
+  }, [finding.id, autoFocus]);
   const evidence = useQuery({
     queryKey: ["evidence", finding.id],
     queryFn: () => resultsApi.evidence(finding.id),
   });
+  const [diffPreference, setDiffPreference] = useState<{ id: string; visible: boolean } | null>(null);
+  const showDiff = diffPreference?.id === finding.id ? diffPreference.visible
+    : finding.change_type === "reworded" || finding.issue_type === "modality_changed" || finding.issue_type === "scope_changed";
   const text = translation ?? finding;
+  const groups = groupEvidence(evidence.data ?? []);
+  const pair = comparisonPair(finding, evidence.data ?? []);
+  const matched = {
+    before: functions.filter((item) => finding.before_function_ids.includes(item.id)),
+    after: functions.filter((item) => finding.after_function_ids.includes(item.id)),
+  };
+  const owners = (side: "before" | "after") => [...new Set(matched[side].map((item) => item.actor_original))].join(", ");
+  const bothAfter = (finding.issue_type === "overlap" || finding.issue_type === "potential_conflict") && groups.after.length > 1;
 
   async function copyLink() {
     try {
       const url = new URL(window.location.href);
       url.searchParams.set("finding", finding.id);
       url.searchParams.set("tab", "functions");
-      url.searchParams.delete("source");
+      for (const key of ["source", "q", "change", "issue", "review", "unit"])
+        url.searchParams.delete(key);
       await navigator.clipboard.writeText(url.href);
-      toast.success(
-        t("Ссылка скопирована", "Сілтеме көшірілді", "Link copied"),
-      );
+      toast.success(t("Ссылка скопирована", "Сілтеме көшірілді", "Link copied"));
     } catch {
-      toast.error(
-        t(
-          "Не удалось скопировать ссылку. Скопируйте адрес страницы.",
-          "Сілтемені көшіру мүмкін болмады. Бет мекенжайын көшіріңіз.",
-          "Could not copy the link. Copy the page address instead.",
-        ),
-      );
+      toast.error(t("Не удалось скопировать ссылку. Скопируйте адрес страницы.", "Сілтемені көшіру мүмкін болмады. Бет мекенжайын көшіріңіз.", "Could not copy the link. Copy the page address instead."));
     }
   }
 
   return (
-    <section
-      aria-label={t(
-        "Доказательства вывода",
-        "Қорытынды дәлелдері",
-        "Finding evidence",
-      )}
-      className="min-w-0 space-y-4 rounded-lg border bg-card p-4"
-      onKeyDown={(event) => {
-        if (event.key === "Escape") onClose();
-      }}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <h3
-          ref={heading}
-          tabIndex={-1}
-          className="font-semibold break-words focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {text.title}
-        </h3>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t("Закрыть вывод", "Қорытындыны жабу", "Close finding")}
-          onClick={onClose}
-        >
-          <X className="size-4" />
-        </Button>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Badge variant="outline">{changeLabel(finding.change_type, t)}</Badge>
-        {finding.issue_type ? (
-          <Badge variant="secondary">{issueLabel(finding.issue_type, t)}</Badge>
-        ) : null}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            void copyLink();
-          }}
-        >
-          <Copy className="size-3.5" />
-          {t("Ссылка", "Сілтеме", "Copy link")}
-        </Button>
-      </div>
-      <p className="whitespace-pre-wrap break-words text-sm">
-        {text.explanation}
-      </p>
-      <div className="rounded-md bg-muted p-3 text-sm">
-        <p className="mb-1 font-medium">
-          {t("Рекомендация", "Ұсыным", "Recommendation")}
-        </p>
-        <p className="whitespace-pre-wrap break-words">{text.recommendation}</p>
-      </div>
-      {evidence.isPending ? (
-        <p role="status" className="text-sm">
-          {t(
-            "Загрузка доказательств…",
-            "Дәлелдер жүктелуде…",
-            "Loading evidence…",
-          )}
-        </p>
-      ) : null}
-      {evidence.isError ? (
-        <RequestError
-          error={evidence.error}
-          retry={() => {
-            void evidence.refetch();
-          }}
-        />
-      ) : null}
-      {evidence.data ? (
-        <div className="space-y-4">
-          {(["before", "after"] as const).map((side) => {
-            const items = evidence.data.filter((item) => item.side === side);
-            const functionIds =
-              side === "before"
-                ? finding.before_function_ids
-                : finding.after_function_ids;
-            const matched = functions.filter((item) =>
-              functionIds.includes(item.id),
-            );
-            return (
-              <div className="space-y-3" key={side}>
-                <h4 className="border-b pb-1 text-sm font-semibold">
-                  {side === "before"
-                    ? t("До", "Дейін", "Before")
-                    : t("После", "Кейін", "After")}
-                </h4>
-                {matched.map((item) => (
-                  <details
-                    className="rounded-md border p-2 text-sm"
-                    key={item.id}
-                  >
-                    <summary className="cursor-pointer break-words">
-                      {item.actor_original}: {item.action} {item.object}
-                    </summary>
-                    <dl className="mt-2 space-y-1 text-muted-foreground">
-                      <div>
-                        <dt className="inline font-medium">
-                          {t("Область", "Қолданылу аясы", "Scope")}:{" "}
-                        </dt>
-                        <dd className="inline whitespace-pre-wrap">
-                          {item.scope || "—"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="inline font-medium">
-                          {t("Условие", "Шарт", "Condition")}:{" "}
-                        </dt>
-                        <dd className="inline whitespace-pre-wrap">
-                          {item.condition || "—"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="inline font-medium">
-                          {t("Обязательность", "Міндеттілік", "Modality")}:{" "}
-                        </dt>
-                        <dd className="inline whitespace-pre-wrap">
-                          {item.modality || "—"}
-                        </dd>
-                      </div>
-                    </dl>
-                  </details>
-                ))}
-                {items.length ? (
-                  items.map((item, index) => (
-                    <article
-                      className="space-y-2 rounded-md border p-3"
-                      key={`${item.source_id}-${index}`}
-                    >
-                      <p className="break-words text-xs font-medium">
-                        {item.filename}
-                        {item.clause_no
-                          ? ` · ${t("п.", "т.", "clause")} ${item.clause_no}`
-                          : ""}
-                        {item.evidence_role === "context"
-                          ? ` · ${t("Контекст", "Контекст", "Context")}`
-                          : ""}
-                      </p>
-                      <blockquote className="whitespace-pre-wrap break-words border-l-2 border-primary pl-3 text-sm leading-relaxed">
-                        {item.excerpt}
-                      </blockquote>
-                      {item.excerpt !== item.original_text ? (
-                        <details className="text-sm">
-                          <summary className="cursor-pointer text-muted-foreground">
-                            {t(
-                              "Полный исходный фрагмент",
-                              "Толық бастапқы үзінді",
-                              "Full original block",
-                            )}
-                          </summary>
-                          <p className="mt-2 whitespace-pre-wrap break-words">
-                            {item.original_text}
-                          </p>
-                        </details>
-                      ) : null}
-                      <Button
-                        variant="link"
-                        size="sm"
-                        onClick={() => onSource(item.source_id)}
-                      >
-                        {t(
-                          "Открыть пункт и контекст",
-                          "Тармақ пен контексті ашу",
-                          "Open clause and context",
-                        )}
-                      </Button>
-                    </article>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    {t(
-                      "Источник на этой стороне не указан.",
-                      "Бұл тарапта дереккөз көрсетілмеген.",
-                      "No evidence is recorded on this side.",
-                    )}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-          <p className="text-xs text-muted-foreground">
-            {t(
-              "Цитаты сохранены без перевода.",
-              "Дәйексөздер аудармасыз сақталған.",
-              "Quotations remain in their original language.",
-            )}
-          </p>
+    <section aria-label={t("Доказательства вывода", "Қорытынды дәлелдері", "Finding evidence")}
+      className="@container min-w-0 space-y-5 rounded-xl border bg-card p-4 sm:p-5"
+      onKeyDown={(event) => { if (event.key === "Escape") onClose(); }}>
+      <header className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <FindingStatusBadge changeType={finding.change_type} issueType={finding.issue_type ?? undefined} />
+          {finding.issue_type ? <FindingStatusBadge changeType={finding.change_type} /> : null}
+          <FindingStatusBadge reviewStatus={finding.review.status} />
+          <div className="ml-auto flex items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={() => { void copyLink(); }}><Copy className="size-3.5" aria-hidden="true" />{t("Ссылка", "Сілтеме", "Copy link")}</Button>
+            <Button variant="ghost" size="icon" aria-label={t("Закрыть вывод", "Қорытындыны жабу", "Close finding")} onClick={onClose}><X className="size-4" aria-hidden="true" /></Button>
+          </div>
         </div>
-      ) : null}
+        <h3 ref={heading} tabIndex={-1} className="text-lg font-semibold leading-snug break-words focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{text.title}</h3>
+        {matched.before.length || matched.after.length ? <p className="flex flex-wrap items-center gap-1.5 text-sm">
+          <span className="text-muted-foreground">{bothAfter ? t("Исполнители «После»", "«Кейін» орындаушылары", "After owners") : t("Исполнитель", "Орындаушы", "Owner")}:</span>
+          {!bothAfter ? <><span>{owners("before") || "—"}</span><ArrowRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" /></> : null}
+          <span>{owners("after") || t("Не установлен в «После»", "«Кейін» анықталмаған", "Not established in After")}</span>
+        </p> : null}
+      </header>
+      <div className="grid gap-4 @xl:grid-cols-2">
+        <div className="space-y-1.5">
+          <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("Что изменилось", "Не өзгерді", "What changed")}</h4>
+          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{text.explanation}</p>
+        </div>
+        <div className="space-y-1.5">
+          <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("Что проверить", "Нені тексеру керек", "What to check")}</h4>
+          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{text.recommendation}</p>
+        </div>
+      </div>
+      {evidence.isPending ? <p role="status" className="text-sm text-muted-foreground">{t("Загрузка доказательств…", "Дәлелдер жүктелуде…", "Loading evidence…")}</p> : null}
+      {evidence.isError ? <RequestError error={evidence.error} retry={() => { void evidence.refetch(); }} /> : null}
+      {evidence.data ? <>
+        <div className="grid gap-4 @xl:grid-cols-2">
+          {(["before", "after"] as const).map((side) => <section key={side} className="min-w-0 space-y-3" aria-label={side === "before" ? t("Цитаты «До»", "«Дейін» дәйексөздері", "Before quotations") : t("Цитаты «После»", "«Кейін» дәйексөздері", "After quotations")}>
+            <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{side === "before" ? t("«До»", "«Дейін»", "Before") : t("«После»", "«Кейін»", "After")} · {groups[side].length}</h4>
+            {groups[side].length ? groups[side].map((item, index) => <EvidenceCard key={`${finding.id}:${item.source_id}:${index}`} item={item} analysisId={analysisId} document={documents.find((doc) => doc.id === item.document_id)} onSource={onSource} />) : <div className="flex min-h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/20 p-5 text-center text-sm">
+              <SearchX className="size-5 text-muted-foreground" aria-hidden="true" />
+              <p>{side === "before" && bothAfter ? t("Оба пункта — в комплекте «После»", "Екі тармақ та «Кейін» жиынтығында", "Both supporting clauses are in the After set") : side === "after" ? t("Подтверждённое соответствие в «После» не указано", "«Кейін» расталған сәйкестік көрсетілмеген", "No confirmed After counterpart is recorded") : t("Подтверждённый пункт «До» не указан", "Расталған «Дейін» тармағы көрсетілмеген", "No confirmed Before clause is recorded")}</p>
+              {!bothAfter ? <p className="text-xs text-muted-foreground">{t("Это не доказывает отсутствие самой обязанности. Проверьте полноту поиска и документов.", "Бұл міндеттің жоқтығын дәлелдемейді. Іздеу мен құжаттардың толықтығын тексеріңіз.", "This does not establish that the duty is absent. Check search coverage and document completeness.")}</p> : null}
+            </div>}
+            {matched[side].length ? <details className="rounded-lg bg-muted/30 p-3 text-xs">
+              <summary className="cursor-pointer font-medium">{t("Область ответственности и условия", "Жауапкершілік аясы мен шарттары", "Responsibility scope and conditions")}</summary>
+              <div className="mt-3 space-y-3">{matched[side].map((item) => <div key={item.id} className="space-y-1 break-words">
+                <p className="font-medium">{item.actor_original}: {item.action} {item.object}</p>
+                <p>{t("Область", "Қолданылу аясы", "Scope")}: {item.scope || "—"}</p>
+                <p>{t("Условие", "Шарт", "Condition")}: {item.condition || "—"}</p>
+                <p>{t("Обязательность", "Міндеттілік", "Modality")}: {item.modality || "—"}</p>
+              </div>)}</div>
+            </details> : null}
+          </section>)}
+        </div>
+        {groups.context.length ? <section className="space-y-3">
+          <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("Дополнительный контекст", "Қосымша контекст", "Additional context")}</h4>
+          <div className="grid gap-3 @xl:grid-cols-2">{groups.context.map((item, index) => <EvidenceCard key={`context:${finding.id}:${item.source_id}:${index}`} item={item} analysisId={analysisId} document={documents.find((doc) => doc.id === item.document_id)} onSource={onSource} />)}</div>
+        </section> : null}
+        {pair ? <div className="space-y-3">
+          <Button variant="outline" size="sm" aria-pressed={showDiff} onClick={() => setDiffPreference({ id: finding.id, visible: !showDiff })}><GitCompareArrows className="size-4" aria-hidden="true" />{showDiff ? t("Скрыть различия слов", "Сөз айырмашылықтарын жасыру", "Hide word differences") : t("Показать различия слов", "Сөз айырмашылықтарын көрсету", "Show word differences")}</Button>
+          {showDiff ? <WordDiff before={pair.before.original_text} after={pair.after.original_text} /> : null}
+        </div> : null}
+        <p className="text-xs text-muted-foreground">{t("Цитаты приведены дословно. Подсветка отмечает доказательство; зачёркивание и подчёркивание — различия текста.", "Дәйексөздер сөзбе-сөз берілген. Ерекшелеу дәлелді, сызу мен астын сызу мәтін айырмашылығын көрсетеді.", "Quotations remain verbatim. Highlighting marks evidence; strike-through and underlining mark text differences.")}</p>
+      </> : null}
       {finding.search ? (
         <details
           open={!finding.search.complete}
           className="rounded-md border p-3 text-sm"
         >
           <summary className="cursor-pointer font-medium">
-            {t(
-              "Проверка комплекта «После»",
-              "«Кейін» жиынтығын тексеру",
-              "After-set search",
-            )}{" "}
+            {finding.search.method === "semantic_all_before_batches"
+              ? t(
+                  "Проверка комплекта «До»",
+                  "«Дейін» жиынтығын тексеру",
+                  "Before-set search",
+                )
+              : t(
+                  "Проверка комплекта «После»",
+                  "«Кейін» жиынтығын тексеру",
+                  "After-set search",
+                )}{" "}
             ·{" "}
             {finding.search.complete
               ? t("поиск завершён", "іздеу аяқталды", "search completed")
@@ -316,11 +198,15 @@ export function FindingDetail({
           </div>
         </details>
       ) : null}
-      <ReviewForm
-        key={`${finding.id}-${finding.review.updated_at}`}
-        finding={finding}
-        analysisId={analysisId}
-      />
+      {canReview ? (
+        <ReviewForm key={`${finding.id}-${finding.review.updated_at}`} finding={finding} analysisId={analysisId} disabled={reviewDisabled} onReviewSaved={onReviewSaved} />
+      ) : (
+        <div className="space-y-2 border-t pt-4 text-sm">
+          <p className="font-medium">{t("Проверка человеком", "Адамның тексеруі", "Human review")}: {reviewLabel(finding.review.status, t)}</p>
+          {finding.review.note ? <p className="whitespace-pre-wrap break-words">{finding.review.note}</p> : null}
+          <p className="text-muted-foreground">{t("Сохранённые доказательства доступны для чтения. Проверка станет доступна после завершения обработки.", "Сақталған дәлелдерді оқуға болады. Тексеру өңдеу аяқталған соң қолжетімді болады.", "Saved evidence is available to read. Review becomes available when processing finishes.")}</p>
+        </div>
+      )}
     </section>
   );
 }

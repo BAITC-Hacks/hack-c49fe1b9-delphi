@@ -44,7 +44,9 @@ Use tools to inspect unclear names and parent context.
         for side, ids in (("before", match.before_unit_ids), ("after", match.after_unit_ids)):
             if any(unit_id not in units or units[unit_id].side != side for unit_id in ids):
                 raise AgentError("Structure cites unknown or wrong-side units")
-        if any(source_id not in tools.sources for source_id in match.source_ids):
+        if len(match.source_ids) != len(set(match.source_ids)) or any(
+            source_id not in tools.sources for source_id in match.source_ids
+        ):
             raise AgentError("Structure cites unknown sources")
         if any(
             not set(units[unit_id].source_ids).intersection(match.source_ids)

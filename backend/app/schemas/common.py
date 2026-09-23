@@ -44,7 +44,14 @@ class TranslatedFinding(BaseModel):
     recommendation: str
 
 
+class TranslatedStructure(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str
+    explanation: str
+
+
 class TranslatedPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
     findings: list[TranslatedFinding]
     summary: str
+    structure: list[TranslatedStructure] = Field(default_factory=list)

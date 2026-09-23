@@ -1,9 +1,10 @@
 from io import BytesIO
-from pathlib import PurePath
+from pathlib import PurePath, PurePosixPath
 from zipfile import BadZipFile, ZipFile
 
 from .common import assemble
 from .docx import read_docx
+from .limits import MAX_ZIP_ENTRIES
 from .markdown import read_markdown
 from .pdf import read_pdf
 from .types import ParsedBlock, ParsedDocument, ParseError
@@ -18,6 +19,8 @@ def _validate_office(content: bytes, extension: str, max_uncompressed_bytes: int
     try:
         with ZipFile(BytesIO(content)) as archive:
             entries = archive.infolist()
+            if len(entries) > MAX_ZIP_ENTRIES:
+                raise ParseError("archive_entry_limit", "The Office archive has too many entries.")
             names = [entry.filename for entry in entries]
             if len(set(names)) != len(names) or not required.issubset(names):
                 raise ParseError(
@@ -26,11 +29,33 @@ def _validate_office(content: bytes, extension: str, max_uncompressed_bytes: int
                 )
             if any(entry.flag_bits & 1 for entry in entries):
                 raise ParseError("encrypted_document", "Encrypted Office files are not supported.")
+            for entry in entries:
+                name = PurePosixPath(entry.filename.replace("\\", "/"))
+                if name.is_absolute() or ".." in name.parts:
+                    raise ParseError(
+                        "invalid_format", "The Office archive has an unsafe member path."
+                    )
             if sum(entry.file_size for entry in entries) > max_uncompressed_bytes:
                 raise ParseError(
                     "expanded_size_limit",
                     "The expanded Office document exceeds the configured size limit.",
                 )
+            for entry in entries:
+                if (
+                    entry.file_size > 1024 * 1024
+                    and entry.file_size / max(entry.compress_size, 1) > 200
+                ):
+                    raise ParseError(
+                        "compression_ratio_limit",
+                        "The Office archive compression ratio exceeds the parser limit.",
+                    )
+                if entry.filename.lower().endswith((".xml", ".rels")):
+                    xml = archive.read(entry).upper().replace(b"\x00", b"")
+                    if b"<!DOCTYPE" in xml or b"<!ENTITY" in xml:
+                        raise ParseError(
+                            "unsupported_xml",
+                            "Office XML with DTD/entity declarations is unsupported.",
+                        )
             if archive.testzip() is not None:
                 raise ParseError("corrupt_document", "The Office archive contains damaged entries.")
     except BadZipFile as exc:

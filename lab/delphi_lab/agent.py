@@ -168,7 +168,7 @@ _TOOLS = [
     _tool("get_unit_functions", "Read extracted functions of a known unit on the specified side.", {
         "side": _SIDE, "unit_id": _STRING, "offset": {"type": "integer", "minimum": 0}}),
     _tool("check_references", "Locate numbered internal reference targets; no semantic/legal verdict.", {
-        "document_id": _STRING}),
+        "document_id": _STRING, "offset": {"type": "integer", "minimum": 0}}),
 ]
 
 
@@ -396,6 +396,8 @@ class _Runner:
                 raise ValueError(f"{stage}: provider response is {response.status}; batch not accepted")
             function_calls = [item for item in response.output if item.type == "function_call"]
             if function_calls:
+                if not tools:
+                    raise ValueError(f"{stage}: provider called a tool outside a tool-enabled stage")
                 if round_no >= self.max_tool_rounds:
                     raise _Stopped("Tool round limit exhausted; batch left unprocessed.")
                 conversation.extend(response.output)
@@ -420,14 +422,19 @@ class _Runner:
         block = self.blocks[source_id]
         parents, seen = [], {source_id}
         parent = block.parent_id
-        while parent and parent not in seen:
+        while parent:
+            if parent in seen:
+                raise ValueError("Source parent hierarchy contains a cycle")
             seen.add(parent)
             if parent not in self.blocks:
                 raise ValueError(f"Unknown parent source ID: {parent}")
             item = self.blocks[parent]
             if item.document_id != block.document_id or item.side != block.side:
                 raise ValueError("Parent source belongs to another document or side")
-            parents.append({"id": item.id, "text": item.original_text})
+            if item.kind == "toc":
+                raise ValueError("Source parent cannot be a table of contents")
+            parents.append({"id": item.id, "text": item.original_text,
+                            "clause_no": item.clause_no, "locator": item.locator})
             parent = item.parent_id
         return {"id": block.id, "side": block.side, "document_id": block.document_id,
                 "clause_no": block.clause_no, "locator": block.locator,
@@ -437,7 +444,7 @@ class _Runner:
         started = time.monotonic()
         expected = {"search_clauses": {"side", "query", "filters", "offset"},
                     "get_clause": {"source_id"}, "get_unit_functions": {"side", "unit_id", "offset"},
-                    "check_references": {"document_id"}}
+                    "check_references": {"document_id", "offset"}}
         if name not in expected or not isinstance(args, dict):
             raise ValueError("Unknown tool or invalid arguments")
         # offset defaults preserve old saved calls and direct helper callers.
@@ -454,6 +461,8 @@ class _Runner:
             if not isinstance(filters, dict) or set(filters) - {"document_id", "clause_prefix"}:
                 raise ValueError("Unknown search filter")
             doc_id, prefix = filters.get("document_id"), filters.get("clause_prefix")
+            if any(value is not None and not isinstance(value, str) for value in (doc_id, prefix)):
+                raise ValueError("Search filters must be strings or null")
             if doc_id and not any(d.id == doc_id and d.side == side for d in self.documents):
                 raise ValueError("Search document is unknown or on the wrong side")
             corpus = [b for b in self.blocks.values() if b.side == side
@@ -500,7 +509,7 @@ class _Runner:
                 selected.append(function)
                 chars += size
             next_offset = offset + len(selected)
-            output = {"functions": selected, "total": len(functions), "offset": offset,
+            output = {"unit": unit.model_dump(), "functions": selected, "total": len(functions), "offset": offset,
                       "has_more": next_offset < len(functions),
                       "next_offset": next_offset if next_offset < len(functions) else None,
                       "truncated": next_offset < len(functions)}
@@ -518,8 +527,20 @@ class _Runner:
                     number = match.group(1).rstrip(".")
                     references.append({"source_id": block.id, "reference": number,
                                        "target_ids": targets.get(number, [])})
-            output = {"references": references[:60], "total": len(references),
-                      "truncated": len(references) > 60, "semantic_check": "not performed by this tool"}
+            selected, chars = [], 0
+            for reference in references[offset:offset + 60]:
+                size = len(_dump(reference))
+                if chars + size > self.max_input_chars:
+                    if not selected:
+                        raise ValueError("Reference exceeds tool output budget")
+                    break
+                selected.append(reference)
+                chars += size
+            next_offset = offset + len(selected)
+            output = {"references": selected, "total": len(references), "offset": offset,
+                      "next_offset": next_offset if next_offset < len(references) else None,
+                      "has_more": next_offset < len(references),
+                      "truncated": next_offset < len(references), "semantic_check": "not performed by this tool"}
         else:
             raise ValueError(f"Unknown tool: {name}")
         ids = []
@@ -542,7 +563,7 @@ class _Runner:
             for block in batch:
                 for parent in self.source(block["id"])["parents"]:
                     if parent["id"] not in primary_ids:
-                        context[parent["id"]] = parent
+                        context[parent["id"]] = self.source(parent["id"])
             payload = {"side": side, "primary_blocks": batch, "context_blocks": list(context.values())}
             if len(_dump(payload)) > self.max_input_chars and len(batch) > 1:
                 middle = len(batch) // 2
@@ -553,7 +574,8 @@ class _Runner:
     def extract(self) -> None:
         minimum_calls = sum(len(list(self.extraction_batches([
             {"id": b.id, "text": b.original_text, "kind": b.kind,
-             "clause_no": b.clause_no, "parent_id": b.parent_id}
+             "clause_no": b.clause_no, "parent_id": b.parent_id,
+             "locator": b.locator, "document_id": b.document_id}
             for b in doc.blocks if b.kind != "toc" and b.id not in self.processed], doc.side)))
             for doc in self.documents)
         self.result.usage["minimum_remaining_extraction_calls_at_start"] = minimum_calls
@@ -568,7 +590,8 @@ class _Runner:
             if toc:
                 self.result.trace.append({"operation": "skip_toc", "source_ids": toc})
             primary = [{"id": b.id, "text": b.original_text, "kind": b.kind,
-                        "clause_no": b.clause_no, "parent_id": b.parent_id}
+                        "clause_no": b.clause_no, "parent_id": b.parent_id,
+                        "locator": b.locator, "document_id": b.document_id}
                        for b in doc.blocks if b.kind != "toc" and b.id not in self.processed]
             pending = list(self.extraction_batches(primary, doc.side))
             while pending:
@@ -576,13 +599,15 @@ class _Runner:
                 self.check_budget()
                 try:
                     parsed = self.request("extract", payload, _Extraction)
-                    if set(parsed.processed_source_ids) != primary_ids:
+                    if (len(parsed.processed_source_ids) != len(primary_ids)
+                            or set(parsed.processed_source_ids) != primary_ids):
                         raise ValueError("Extraction did not acknowledge exactly all primary source IDs")
                     local_units: dict[str, str] = {}
                     accepted_units = []
                     for unit in parsed.units:
                         self.validate_sources(unit.source_ids, doc.side, allowed)
-                        if unit.side != doc.side or unit.id in local_units or not unit.name_original.strip():
+                        if (unit.side != doc.side or unit.id in local_units or not unit.id.strip()
+                                or not unit.name_original.strip()):
                             raise ValueError("Unit side or duplicate local unit ID is invalid")
                         stable = _id("u_", doc.side, unit.kind, _norm(unit.name_original))
                         local_units[unit.id] = stable
@@ -593,8 +618,13 @@ class _Runner:
                             raise ValueError("Unit parent is unknown or refers to itself")
                         accepted.parent_unit_id = local_units[parent] if parent is not None else None
                     accepted_functions = []
+                    local_function_ids = set()
                     for function in parsed.functions:
                         self.validate_sources(function.source_ids, doc.side, allowed)
+                        if (not function.id.strip() or function.id in local_function_ids
+                                or len(function.owner_unit_ids) != len(set(function.owner_unit_ids))):
+                            raise ValueError("Function has empty/duplicate ID or duplicate owner references")
+                        local_function_ids.add(function.id)
                         if function.side != doc.side or not primary_ids.intersection(function.source_ids) or not function.action.strip():
                             raise ValueError("Function side or primary evidence is invalid")
                         if any(owner not in local_units for owner in function.owner_unit_ids):
@@ -624,6 +654,11 @@ class _Runner:
                             current = units[current.parent_unit_id]
                     functions = {f.id: f for f in self.result.functions}
                     functions.update({f.id: f for f in accepted_functions})
+                    prior_units = {unit.id: unit.parent_unit_id for unit in self.result.units}
+                    next_units = {unit.id: unit.parent_unit_id for unit in units.values()}
+                    if (set(functions) != {f.id for f in self.result.functions}
+                            or prior_units != next_units):
+                        self.invalidate_derived_work()
                     self.result.units, self.result.functions = list(units.values()), list(functions.values())
                     self.processed.update(primary_ids)
                 except _OutputLimit as exc:
@@ -641,12 +676,39 @@ class _Runner:
                     self.result.errors.append(f"Extraction batch {doc.id}/{batch[0]['id']}: {exc}")
                 self.checkpoint("extract")
 
+    def invalidate_derived_work(self) -> None:
+        """A resumed catalog can grow; prior coverage cannot certify new candidates.
+
+        Keep accepted model output in the audit trace while rebuilding derived
+        conclusions. Raw-source sweeps remain reusable: their targets and frozen
+        input blocks have not changed. Extraction-only resumes incur no rework.
+        """
+        if not (self.result.findings or self.result.structure or self.compared
+                or self.candidate_reviewed or self.risk_reviewed or self.classified_after):
+            return
+        self.result.trace.append({
+            "operation": "derived_results_invalidated",
+            "reason": "accepted extraction changed the function catalog or unit hierarchy",
+            "prior_findings": [row.model_dump() for row in self.result.findings],
+            "prior_structure": [row.model_dump() for row in self.result.structure],
+            "prior_compared_function_ids": sorted(self.compared),
+            "prior_risk_reviewed_function_ids": sorted(self.risk_reviewed),
+        })
+        self.result.findings = []
+        self.result.structure = []
+        self.compared.clear()
+        self.candidate_reviewed.clear()
+        self.risk_reviewed.clear()
+        self.classified_after.clear()
+        self.unmatched_sweeps.clear()
+
     def validate_sources(self, ids: list[str], side: str, allowed: set[str] | None = None) -> None:
-        if not ids:
-            raise ValueError("Evidence source list is empty")
+        if not ids or len(ids) != len(set(ids)):
+            raise ValueError("Evidence source list is empty or has duplicates")
         for source_id in ids:
             block = self.blocks.get(source_id)
-            if block is None or block.side != side or (allowed is not None and source_id not in allowed):
+            if (block is None or block.side != side or block.kind == "toc"
+                    or (allowed is not None and source_id not in allowed)):
                 raise ValueError(f"Unknown, wrong-side or out-of-batch source ID: {source_id}")
 
     def validate_finding(self, finding: Finding, *, risk: bool = False) -> Finding:
@@ -663,7 +725,7 @@ class _Runner:
                      for source in functions[fid].source_ids}
         for evidence in finding.evidence:
             block = self.blocks.get(evidence.source_id)
-            if block is None:
+            if block is None or block.kind == "toc":
                 raise ValueError(f"Finding uses unknown source ID: {evidence.source_id}")
             if evidence.evidence_role != "context" and evidence.evidence_role != block.side:
                 raise ValueError("Finding evidence role is on the wrong side")
@@ -674,8 +736,12 @@ class _Runner:
                 raise ValueError("Invalid original-text evidence offsets")
             if evidence.evidence_role != "context":
                 (before_sources if block.side == "before" else after_sources).add(block.id)
-        evidence_ids = {item.source_id for item in finding.evidence}
-        if any(not evidence_ids.intersection(functions[fid].source_ids)
+        evidence_keys = [(e.source_id, e.evidence_role, e.start_offset, e.end_offset)
+                         for e in finding.evidence]
+        if len(evidence_keys) != len(set(evidence_keys)):
+            raise ValueError("Finding repeats an evidence reference")
+        if any(not {e.source_id for e in finding.evidence if e.evidence_role == functions[fid].side}
+               .intersection(functions[fid].source_ids)
                for fid in finding.before_function_ids + finding.after_function_ids):
             raise ValueError("Every referenced function must contribute evidence")
         if risk:
@@ -783,7 +849,8 @@ class _Runner:
                 for side, keys in (("before", row.before_unit_ids), ("after", row.after_unit_ids)):
                     if any(units[key].side != side for key in keys):
                         raise ValueError("Structure cites a unit on the wrong side")
-                if not row.source_ids or any(key not in self.blocks for key in row.source_ids):
+                if (not row.source_ids or len(row.source_ids) != len(set(row.source_ids))
+                        or any(key not in self.blocks or self.blocks[key].kind == "toc" for key in row.source_ids)):
                     raise ValueError("Structure source evidence is empty or unknown")
                 if any(not set(units[key].source_ids).intersection(row.source_ids) for key in ids):
                     raise ValueError("Every structure unit must contribute evidence")
@@ -804,7 +871,11 @@ class _Runner:
 
     def search_sources(self, function: Function, side: str) -> SourceSearch:
         """Inspect original body blocks, including duties extraction may have omitted."""
+        if side not in {"before", "after"} or side == function.side:
+            raise ValueError("Absence search requires the opposite document side")
         state = self.source_sweeps.setdefault(function.id, SourceSearch(side=side))
+        if state.side != side:
+            raise ValueError("Saved source-search side differs from the requested side")
         reviewed, candidates = set(state.reviewed_source_ids), set(state.candidate_source_ids)
         sources = [self.source(b.id) for b in self.blocks.values() if b.side == side and b.kind != "toc"]
         available = {item["id"] for item in sources}
@@ -828,6 +899,7 @@ class _Runner:
                 expected = {item["id"] for item in batch}
                 if (len(result.reviewed_source_ids) != len(set(result.reviewed_source_ids))
                         or set(result.reviewed_source_ids) != expected
+                        or len(result.candidate_source_ids) != len(set(result.candidate_source_ids))
                         or not set(result.candidate_source_ids) <= expected):
                     raise ValueError("Semantic source search has unknown or unreviewed IDs")
                 reviewed.update(expected)
@@ -839,7 +911,7 @@ class _Runner:
             state.errors = list(errors)
             state.complete = False
             self.checkpoint("source_search")
-        state.complete = (not errors and reviewed == available and bool(function.owner_unit_ids)
+        state.complete = (not errors and bool(available) and reviewed == available and bool(function.owner_unit_ids)
                           and all(d.parse_status == "ok" for d in self.documents))
         self.result.errors.extend(errors)
         self.result.trace.append({"operation": "semantic_source_search", "function_id": function.id,
@@ -857,7 +929,10 @@ class _Runner:
             candidates = self.candidates(targets, after, "candidates")
             try:
                 parsed = self.request("compare", self.payload(targets, candidates, "candidates"), _Comparison, tools=True)
-                if set(parsed.reviewed_function_ids) != target_ids or set(parsed.unmatched_function_ids) - target_ids:
+                if (len(parsed.reviewed_function_ids) != len(target_ids)
+                        or set(parsed.reviewed_function_ids) != target_ids
+                        or len(parsed.unmatched_function_ids) != len(set(parsed.unmatched_function_ids))
+                        or set(parsed.unmatched_function_ids) - target_ids):
                     raise ValueError("Comparison coverage IDs do not match target IDs")
                 mapped_ids = {fid for finding in parsed.findings for fid in finding.before_function_ids}
                 if (target_ids - mapped_ids != set(parsed.unmatched_function_ids)
@@ -878,8 +953,14 @@ class _Runner:
         # original opposite-side body source, including non-extracted duties.
         for target in unresolved:
             query = _function_text(target)
-            self.execute_tool("search_clauses", {"side": "after", "query": query,
-                                               "filters": {"document_id": None, "clause_prefix": None}})
+            try:
+                self.execute_tool("search_clauses", {"side": "after", "query": query,
+                                                   "filters": {"document_id": None, "clause_prefix": None}})
+            except ValueError as exc:
+                # A lexical tool's output limit must not prevent the independent
+                # exhaustive source pass. Its coverage is recorded separately.
+                self.result.trace.append({"operation": "lexical_search_unavailable",
+                                          "function_id": target.id, "query": query, "error": str(exc)})
             try:
                 search = self.search_sources(target, "after")
             except _Stopped:
@@ -930,31 +1011,43 @@ class _Runner:
         for function in self.result.functions:
             if function.side != "after" or function.id in mapped | self.classified_after:
                 continue
-            search = self.search_sources(function, "before")
-            added = search.complete and not search.candidate_source_ids
-            titles = {"ru": ("Обязанность впервые указана в комплекте «После»", "Происхождение обязанности требует проверки"),
-                      "kk": ("Міндет «Кейін» жиынтығында алғаш көрсетілген", "Міндеттің шығу тегін тексеру қажет"),
-                      "en": ("Duty first listed in the supplied After set", "Duty provenance needs review")}
-            explanations = {
-                "ru": "Проверены доступные исходные пункты «До». Отсутствие соответствия в комплекте не доказывает дату появления работы.",
-                "kk": "Қолжетімді «Бұрын» дереккөздері тексерілді. Жиынтықта сәйкестіктің болмауы жұмыстың басталу уақытын дәлелдемейді.",
-                "en": "Available original Before sources were checked. Absence of a counterpart does not establish when the work began.",
-            }
-            finding = Finding(id=_id("f_", "addition_review", function.id), title=titles[self.language][0 if added else 1],
-                change_type="added" if added else "review", issue_type="none" if added else "uncertainty",
-                before_function_ids=[], after_function_ids=[function.id], explanation=explanations[self.language],
-                recommendation={"ru": "Подтвердите исполнителя и полноту источников.", "kk": "Орындаушыны және дереккөздердің толықтығын растаңыз.",
-                                "en": "Confirm the owner and completeness of sources."}[self.language],
-                evidence=[Evidence(source_id=key, evidence_role="after") for key in function.source_ids]
-                         + [Evidence(source_id=key, evidence_role="context") for key in search.candidate_source_ids],
-                search=search.model_copy(deep=True))
-            current = {f.id: f for f in self.result.findings}
-            current[finding.id] = finding
-            self.result.findings = list(current.values())
+            try:
+                search = self.search_sources(function, "before")
+            except _Stopped:
+                search = self.source_sweeps.get(function.id, SourceSearch(side="before"))
+                self.add_addition(function, search)
+                self.checkpoint("additions")
+                raise
+            self.add_addition(function, search)
             available = {b.id for b in self.blocks.values() if b.side == "before" and b.kind != "toc"}
             if set(search.reviewed_source_ids) == available and not search.errors:
                 self.classified_after.add(function.id)
             self.checkpoint("additions")
+
+    def add_addition(self, function: Function, search: SourceSearch) -> None:
+        added = search.complete and not search.candidate_source_ids
+        titles = {"ru": ("Обязанность впервые указана в комплекте «После»", "Происхождение обязанности требует проверки"),
+                  "kk": ("Міндет «Кейін» жиынтығында алғаш көрсетілген", "Міндеттің шығу тегін тексеру қажет"),
+                  "en": ("Duty first listed in the supplied After set", "Duty provenance needs review")}
+        explanations = {
+            "ru": ("Все доступные исходные пункты «До» проверены, соответствие не найдено. Это не доказывает дату появления работы.",
+                   "Найдены возможные соответствия в «До» либо поиск или исходные данные неполны. Новая обязанность не установлена."),
+            "kk": ("Қолжетімді «Бұрын» тармақтарының барлығы тексерілді, сәйкестік табылмады. Бұл жұмыстың басталу уақытын дәлелдемейді.",
+                   "«Бұрын» ықтимал сәйкестіктері табылды немесе іздеу не бастапқы деректер толық емес. Жаңа міндет анықталған жоқ."),
+            "en": ("Every available original Before source was checked without finding a counterpart. This does not establish when the work began.",
+                   "Possible Before counterparts were found or the search or inputs are incomplete. A new duty has not been established."),
+        }
+        finding = Finding(id=_id("f_", "addition_review", function.id), title=titles[self.language][0 if added else 1],
+            change_type="added" if added else "review", issue_type="none" if added else "uncertainty",
+            before_function_ids=[], after_function_ids=[function.id], explanation=explanations[self.language][0 if added else 1],
+            recommendation={"ru": "Подтвердите исполнителя и полноту источников.", "kk": "Орындаушыны және дереккөздердің толықтығын растаңыз.",
+                            "en": "Confirm the owner and completeness of sources."}[self.language],
+            evidence=[Evidence(source_id=key, evidence_role="after") for key in function.source_ids]
+                     + [Evidence(source_id=key, evidence_role="context") for key in search.candidate_source_ids],
+            search=search.model_copy(deep=True))
+        current = {f.id: f for f in self.result.findings}
+        current[finding.id] = finding
+        self.result.findings = list(current.values())
 
     def risks(self) -> None:
         after = [f for f in self.result.functions if f.side == "after"]
@@ -964,7 +1057,7 @@ class _Runner:
             candidates = self.candidates(targets, after, "after_risks")
             try:
                 parsed = self.request("risks", self.payload(targets, candidates, "after_risks"), _Risks, tools=True)
-                if set(parsed.reviewed_function_ids) != target_ids:
+                if len(parsed.reviewed_function_ids) != len(target_ids) or set(parsed.reviewed_function_ids) != target_ids:
                     raise ValueError("Risk coverage IDs do not match target IDs")
                 self.accept_findings(parsed.findings, risk=True, target_ids=target_ids)
                 self.risk_reviewed.update(target_ids)
@@ -1038,7 +1131,7 @@ def translate_result(result: AgentResult, locale: str, model: str, *, run_id: st
     if not os.environ.get("OPENAI_API_KEY"):
         raise ValueError("OPENAI_API_KEY is not configured")
     runner = _Runner([], model, locale, 40, 5000, 16000, 0, 600, None, run_id=run_id)
-    translated = []
+    translated, translated_structure = [], []
     try:
         items = [{"id": f.id, "title": f.title, "explanation": f.explanation,
                   "recommendation": f.recommendation} for f in result.findings]
@@ -1049,10 +1142,19 @@ def translate_result(result: AgentResult, locale: str, model: str, *, run_id: st
             if len(actual) != len(expected) or set(actual) != expected:
                 raise ValueError("Translation changed the finding ID set")
             translated.extend(item.model_dump() for item in parsed.findings)
+        structure = [{"id": item.id, "explanation": item.explanation} for item in result.structure]
+        for batch in _batches(structure, 12000, count=15):
+            parsed = runner.request("translation", {"locale": locale, "structure": batch}, _StructureTranslation)
+            expected = {item["id"] for item in batch}
+            actual = [item.id for item in parsed.structure]
+            if len(actual) != len(expected) or set(actual) != expected:
+                raise ValueError("Translation changed the structure ID set")
+            translated_structure.extend(item.model_dump() for item in parsed.structure)
         runner.result.usage.update(model=model, api_calls=runner.calls,
                                   elapsed_seconds=round(time.monotonic() - runner.started, 2))
         runner.result.usage['cost_tracking'] = runner.costs.snapshot()
-        return {"locale": locale, "findings": translated, "usage": runner.result.usage,
+        return {"locale": locale, "findings": translated, "structure": translated_structure,
+                "usage": runner.result.usage,
                 "draft": locale == "kk"}
     finally:
         if runner.client is not None:

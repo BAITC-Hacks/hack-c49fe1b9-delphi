@@ -9,10 +9,14 @@ from app.schemas.common import Locale
 
 
 def render_search(snapshot: ReportSnapshot, search: dict, locale: Locale) -> str:
-    after_sources = {
+    method = search.get("method")
+    if method not in {"semantic_all_after_batches", "semantic_all_before_batches"}:
+        raise DomainError(409, "invalid_saved_search", "Unknown saved search method")
+    side = "before" if method == "semantic_all_before_batches" else "after"
+    searched_sources = {
         str(source.id): source
         for source in snapshot.sources.values()
-        if snapshot.documents[source.document_id].side == "after"
+        if snapshot.documents[source.document_id].side == side
     }
     reviewed = search.get("reviewed_source_ids")
     candidates = search.get("candidate_source_ids")
@@ -26,22 +30,24 @@ def render_search(snapshot: ReportSnapshot, search: dict, locale: Locale) -> str
         or type(complete) is not bool
         or len(reviewed) != len(set(reviewed))
         or len(candidates) != len(set(candidates))
-        or not set(reviewed) <= set(after_sources)
+        or not set(reviewed) <= set(searched_sources)
         or not set(candidates) <= set(reviewed)
         or (
             complete
-            and (set(reviewed) != set(after_sources) or errors or search.get("input_partial"))
+            and (set(reviewed) != set(searched_sources) or errors or search.get("input_partial"))
         )
     ):
         raise DomainError(409, "invalid_saved_search", "Saved search coverage is inconsistent")
     labels = LABELS[locale]
-    reviewed_documents = {after_sources[identifier].document_id for identifier in reviewed}
-    after_documents = {doc.id for doc in snapshot.documents.values() if doc.side == "after"}
+    reviewed_documents = {searched_sources[identifier].document_id for identifier in reviewed}
+    searched_documents = {doc.id for doc in snapshot.documents.values() if doc.side == side}
+    heading = labels["search_before" if side == "before" else "search"]
+    status = labels["search_complete" if complete else ("search_new_incomplete" if side == "before" else "search_incomplete")]
     parts = [
-        f"<h4>{labels['search']}</h4>",
-        f"<p>{labels['search_complete' if complete else 'search_incomplete']}</p>",
-        f"<p>{labels['search_sources']}: {len(reviewed)} / {len(after_sources)} · "
-        f"{labels['documents']}: {len(reviewed_documents)} / {len(after_documents)}</p>",
+        f"<h4>{heading}</h4>",
+        f"<p>{status}</p>",
+        f"<p>{labels['search_sources']}: {len(reviewed)} / {len(searched_sources)} · "
+        f"{labels['documents']}: {len(reviewed_documents)} / {len(searched_documents)}</p>",
         f"<p>{labels['search_scope']}</p>",
         f"<p><strong>{labels['search_candidates']}:</strong> {len(candidates)}</p>",
     ]

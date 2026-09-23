@@ -8,10 +8,17 @@ from app.domain.errors import DomainError
 from app.models import Analysis, Document, Finding, Function, Run, SourceBlock, Unit
 from app.schemas import RunAccepted, RunDetail, RunResponse, StartRun, UnitResponse
 from app.schemas.runs import FunctionResponse
+from app.services.checkpoints import (
+    FAST_PIPELINE_VERSION,
+    PIPELINE_VERSION,
+    clear_generated_result,
+    load_checkpoint,
+    resume_available,
+)
 from app.services.common import get_or_raise
+from app.services.results import validate_registry
+from app.services.sources import load_run_sources
 from app.services.workflow import Workflow
-
-PIPELINE_VERSION = "delphi-0.1"
 
 
 class RunService:
@@ -61,7 +68,9 @@ class RunService:
             stage="queued",
             model=settings.openai_model,
             output_language=body.output_language,
-            pipeline_version=PIPELINE_VERSION,
+            pipeline_version=(
+                FAST_PIPELINE_VERSION if settings.analysis_mode == "fast" else PIPELINE_VERSION
+            ),
             review_revision=0,
             structure=[],
             errors=[],
@@ -100,11 +109,47 @@ class RunService:
         count = await self.db.scalar(
             select(func.count()).select_from(Finding).where(Finding.run_id == run_id)
         )
+        detail = RunResponse.model_validate(run)
+        detail.resume_available = resume_available(run)
         return RunDetail(
-            **RunResponse.model_validate(run).model_dump(),
+            **detail.model_dump(),
             units=[UnitResponse.model_validate(unit) for unit in units],
             finding_count=count,
         )
+
+    async def resume(self, run_id: UUID, settings: Settings, workflow: Workflow) -> RunAccepted:
+        run = await self.db.scalar(select(Run).where(Run.id == run_id).with_for_update())
+        if run is None:
+            raise DomainError(404, "not_found", "Run not found")
+        if run.state in {"queued", "running"}:
+            return RunAccepted(run_id=run.id, state=run.state)
+        if not resume_available(run):
+            raise DomainError(
+                409, "resume_unavailable", "No compatible checkpoint, or human review has changed"
+            )
+        if getattr(settings, "analysis_mode", "full") != "full":
+            raise DomainError(
+                409, "resume_mode_mismatch", "Full checkpoints require ANALYSIS_MODE=full"
+            )
+        if not workflow.available or settings.openai_model != run.model:
+            raise DomainError(409, "resume_model_mismatch", "Resume requires the original AI model")
+        sources = await load_run_sources(self.db, run)
+        try:
+            await validate_registry(self.db, run, sources)
+            load_checkpoint(run, sources)
+        except (ValueError, KeyError) as exc:
+            raise DomainError(409, "invalid_checkpoint", "Checkpoint validation failed") from exc
+        await clear_generated_result(self.db, run)
+        run.trace = [*run.trace, {"operation": "resume", "previous_errors": run.errors}]
+        run.errors = []
+        run.review_revision += 1
+        run.checkpoint = {**run.checkpoint, "review_revision": run.review_revision}
+        run.state = "queued"
+        run.stage = "queued"
+        run.finished_at = None
+        await self.db.commit()
+        workflow.enqueue(run.id)
+        return RunAccepted(run_id=run.id, state=run.state)
 
     async def functions(self, run_id: UUID) -> list[FunctionResponse]:
         await get_or_raise(self.db, Run, run_id)

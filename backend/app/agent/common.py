@@ -4,8 +4,6 @@ from uuid import NAMESPACE_URL, uuid5
 
 from pydantic import BaseModel
 
-from .models import AgentError
-
 
 def stable_id(kind: str, *parts: object) -> str:
     return str(
@@ -26,7 +24,11 @@ def batches[Item: BaseModel](items: Sequence[Item], limit: int) -> list[list[Ite
     for item in items:
         length = len(item.model_dump_json()) + 1
         if length + 2 > limit:
-            raise AgentError("An analysis item exceeds the configured batch character limit")
+            if current:
+                result.append(current)
+                current, size = [], 2
+            result.append([item])  # The request rejects it; other batches can still be retained.
+            continue
         if current and size + length > limit:
             result.append(current)
             current, size = [], 2

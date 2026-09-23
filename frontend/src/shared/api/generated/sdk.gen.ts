@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateAnalysisData, CreateAnalysisErrors, CreateAnalysisResponses, CreateTranslationData, CreateTranslationErrors, CreateTranslationResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, ExportFunctionsData, ExportFunctionsErrors, ExportFunctionsResponses, GetAnalysisData, GetAnalysisErrors, GetAnalysisResponses, GetFindingEvidenceData, GetFindingEvidenceErrors, GetFindingEvidenceResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetReportData, GetReportErrors, GetReportResponses, GetRunData, GetRunErrors, GetRunResponses, GetSourceData, GetSourceErrors, GetSourceResponses, ListAnalysesData, ListAnalysesErrors, ListAnalysesResponses, ListDocumentSourcesData, ListDocumentSourcesErrors, ListDocumentSourcesResponses, ListFindingsData, ListFindingsErrors, ListFindingsResponses, ListFunctionsData, ListFunctionsErrors, ListFunctionsResponses, RepeatAnalysisData, RepeatAnalysisErrors, RepeatAnalysisResponses, StartRunData, StartRunErrors, StartRunResponses, UpdateDocumentData, UpdateDocumentErrors, UpdateDocumentResponses, UpdateFindingReviewData, UpdateFindingReviewErrors, UpdateFindingReviewResponses, UploadDocumentData, UploadDocumentErrors, UploadDocumentResponses } from './types.gen';
+import type { CreateAnalysisData, CreateAnalysisErrors, CreateAnalysisResponses, CreateTranslationData, CreateTranslationErrors, CreateTranslationResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, ExportFunctionsData, ExportFunctionsErrors, ExportFunctionsResponses, GetAnalysisData, GetAnalysisErrors, GetAnalysisResponses, GetFindingEvidenceData, GetFindingEvidenceErrors, GetFindingEvidenceResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetReportData, GetReportErrors, GetReportResponses, GetRunData, GetRunErrors, GetRunResponses, GetSourceData, GetSourceErrors, GetSourceResponses, ListAnalysesData, ListAnalysesErrors, ListAnalysesResponses, ListDocumentSourcesData, ListDocumentSourcesErrors, ListDocumentSourcesResponses, ListFindingsData, ListFindingsErrors, ListFindingsResponses, ListFunctionsData, ListFunctionsErrors, ListFunctionsResponses, RepeatAnalysisData, RepeatAnalysisErrors, RepeatAnalysisResponses, ResumeRunData, ResumeRunErrors, ResumeRunResponses, StartRunData, StartRunErrors, StartRunResponses, UpdateDocumentData, UpdateDocumentErrors, UpdateDocumentResponses, UpdateFindingReviewData, UpdateFindingReviewErrors, UpdateFindingReviewResponses, UploadDocumentData, UploadDocumentErrors, UploadDocumentResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -96,6 +96,11 @@ export const startRun = <ThrowOnError extends boolean = false>(options: Options<
  * Get Run
  */
 export const getRun = <ThrowOnError extends boolean = false>(options: Options<GetRunData, ThrowOnError>): RequestResult<GetRunResponses, GetRunErrors, ThrowOnError> => (options.client ?? client).get<GetRunResponses, GetRunErrors, ThrowOnError>({ url: '/api/runs/{run_id}', ...options });
+
+/**
+ * Resume Run
+ */
+export const resumeRun = <ThrowOnError extends boolean = false>(options: Options<ResumeRunData, ThrowOnError>): RequestResult<ResumeRunResponses, ResumeRunErrors, ThrowOnError> => (options.client ?? client).post<ResumeRunResponses, ResumeRunErrors, ThrowOnError>({ url: '/api/runs/{run_id}/resume', ...options });
 
 /**
  * List Functions

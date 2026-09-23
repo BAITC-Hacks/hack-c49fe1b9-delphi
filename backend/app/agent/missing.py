@@ -1,5 +1,7 @@
+"""Absence claims require an exhaustive pass over immutable opposite-side sources."""
+
 from . import prompts
-from .common import batches, stable_id
+from .common import batches, serialized, stable_id
 from .model_client import ModelClient
 from .models import (
     AgentError,
@@ -22,37 +24,99 @@ async def verify_missing(
     incomplete: bool,
     tools: SourceTools,
 ) -> None:
-    after_sources = [source for source in sources if source.side == "after"]
+    await _verify_absence(
+        model_client,
+        max_batch_chars,
+        finding,
+        functions,
+        sources,
+        language,
+        incomplete,
+        tools,
+        "after",
+    )
+
+
+async def verify_new(
+    model_client: ModelClient,
+    max_batch_chars: int,
+    finding: FindingOutput,
+    functions: dict[str, FunctionOutput],
+    sources: list[SourceInput],
+    language: str,
+    incomplete: bool,
+    tools: SourceTools,
+) -> None:
+    await _verify_absence(
+        model_client,
+        max_batch_chars,
+        finding,
+        functions,
+        sources,
+        language,
+        incomplete,
+        tools,
+        "before",
+    )
+
+
+async def _verify_absence(
+    model_client: ModelClient,
+    max_batch_chars: int,
+    finding: FindingOutput,
+    functions: dict[str, FunctionOutput],
+    sources: list[SourceInput],
+    language: str,
+    incomplete: bool,
+    tools: SourceTools,
+    side: str,
+) -> None:
+    opposite = [source for source in sources if source.side == side]
+    target_ids = finding.before_function_ids if side == "after" else finding.after_function_ids
+    targets = [functions[identifier] for identifier in target_ids]
     reviewed: set[str] = set()
     candidates: set[str] = set()
     search_errors = []
-    for batch in batches(after_sources, max_batch_chars):
+    payload_base = {
+        "output_language": language,
+        "before_functions" if side == "after" else "after_functions": [
+            item.model_dump() for item in targets
+        ],
+        "target_sources": [
+            source.model_dump()
+            for source in sources
+            if any(source.id in function.source_ids for function in targets)
+        ],
+    }
+    allowance = max_batch_chars - len(serialized(payload_base)) - 64
+    for batch in batches(opposite, max(1, allowance)):
         try:
             result = await model_client.request(
-                prompts.MISSING_SEARCH,
-                {
-                    "output_language": language,
-                    "before_functions": [
-                        functions[function_id].model_dump()
-                        for function_id in finding.before_function_ids
-                    ],
-                    "after_sources": [source.model_dump() for source in batch],
-                },
+                prompts.MISSING_SEARCH if side == "after" else prompts.NEW_SEARCH,
+                {**payload_base, f"{side}_sources": [source.model_dump() for source in batch]},
                 MissingSearch,
             )
             expected = {source.id for source in batch}
             if (
-                set(result.reviewed_source_ids) != expected
+                len(result.reviewed_source_ids) != len(expected)
+                or set(result.reviewed_source_ids) != expected
+                or len(result.candidate_source_ids) != len(set(result.candidate_source_ids))
                 or not set(result.candidate_source_ids) <= expected
             ):
-                raise AgentError("Missing-function search cites unknown or unreviewed sources")
+                raise AgentError("Absence search cites unknown, repeated or unreviewed sources")
             reviewed.update(expected)
             candidates.update(result.candidate_source_ids)
         except AgentError as exc:
             search_errors.append(str(exc))
-    complete = not incomplete and not search_errors and len(reviewed) == len(after_sources)
+    complete = (
+        bool(opposite)
+        and not incomplete
+        and not search_errors
+        and all(function.owner_unit_ids for function in targets)
+        and len(reviewed) == len(opposite)
+    )
     finding.search = {
-        "method": "semantic_all_after_batches",
+        "method": f"semantic_all_{side}_batches",
         "complete": complete,
         "reviewed_source_ids": sorted(reviewed),
         "candidate_source_ids": sorted(candidates),
@@ -60,43 +124,59 @@ async def verify_missing(
     }
     tools.operations.append(
         {
-            "tool": "semantic_missing_check",
+            "tool": "semantic_missing_check" if side == "after" else "semantic_new_check",
             "finding_id": finding.id,
             "reviewed_sources": len(reviewed),
             "candidate_source_ids": sorted(candidates),
             "complete": complete,
         }
     )
-    if candidates or not complete:
-        finding.change_type = "changed"
-        finding.issue_type = "insufficient_evidence"
+    absent = complete and not candidates
+    if not absent:
+        finding.change_type, finding.issue_type = "changed", "insufficient_evidence"
         finding.title = {
             "ru": "Соответствие требует проверки",
             "kk": "Сәйкестікті тексеру қажет",
             "en": "Function mapping needs review",
         }[language]
         finding.explanation = {
-            "ru": "Поиск обнаружил возможные соответствия либо выполнен не полностью. Потеря функции не установлена.",
-            "kk": "Іздеу ықтимал сәйкестіктерді тапты немесе толық аяқталмады. Функцияның жоғалғаны анықталған жоқ.",
-            "en": "The search found possible matches or is incomplete. A missing duty has not been established.",
+            "ru": "Есть возможные соответствия либо поиск или источники неполны. Отсутствие соответствия не установлено.",
+            "kk": "Ықтимал сәйкестіктер бар немесе іздеу не дереккөздер толық емес. Сәйкестіктің жоқтығы анықталған жоқ.",
+            "en": "Possible counterparts exist or the search or inputs are incomplete. Absence has not been established.",
         }[language]
-        for source_id in sorted(candidates):
-            finding.evidence.append(EvidenceOutput(source_id=source_id, evidence_role="after"))
-    else:
+        existing = {item.source_id for item in finding.evidence}
+        finding.evidence.extend(
+            EvidenceOutput(source_id=key, evidence_role="context")
+            for key in sorted(candidates - existing)
+        )
+    elif side == "after":
+        finding.change_type, finding.issue_type = "potentially_missing", None
         finding.title = {
-            "ru": "Соответствие не найдено в предоставленном комплекте",
-            "kk": "Берілген құжаттар жиынтығында сәйкестік табылмады",
+            "ru": "Соответствие не найдено в предоставленном комплекте «После»",
+            "kk": "Берілген «Кейін» жиынтығында сәйкестік табылмады",
             "en": "No counterpart found in the supplied After set",
         }[language]
         finding.explanation = {
-            "ru": "Все доступные пункты комплекта «После» проверены на возможное соответствие этой обязанности. Соответствие не найдено; это не доказывает прекращения деятельности организации.",
-            "kk": "Берілген «Кейін» жиынтығының барлық қолжетімді тармақтары осы міндетке сәйкестікке тексерілді. Сәйкестік табылмады; бұл ұйым қызметінің тоқтағанын дәлелдемейді.",
-            "en": "Every available After source was checked for a counterpart to this duty. None was found; this does not prove that the organization stopped performing it.",
+            "ru": "Все доступные исходные пункты «После» проверены. Соответствие не найдено; это не доказывает прекращение деятельности.",
+            "kk": "Қолжетімді «Кейін» тармақтарының барлығы тексерілді. Сәйкестік табылмады; бұл қызметтің тоқтағанын дәлелдемейді.",
+            "en": "Every available After source was checked. No counterpart was found; this does not prove the activity stopped.",
+        }[language]
+    else:
+        finding.change_type, finding.issue_type = "new", None
+        finding.title = {
+            "ru": "Обязанность впервые указана в предоставленном комплекте «После»",
+            "kk": "Міндет берілген «Кейін» жиынтығында алғаш көрсетілген",
+            "en": "Duty first listed in the supplied After set",
+        }[language]
+        finding.explanation = {
+            "ru": "Все доступные исходные пункты «До» проверены, соответствие не найдено. Это не доказывает дату появления работы.",
+            "kk": "Қолжетімді «Бұрын» тармақтарының барлығы тексерілді, сәйкестік табылмады. Бұл жұмыстың басталу уақытын дәлелдемейді.",
+            "en": "Every available Before source was checked without a counterpart. This does not establish when the work began.",
         }[language]
     finding.recommendation = {
-        "ru": "Проверьте область ответственности и полноту комплекта документов перед решением.",
-        "kk": "Шешім қабылдамас бұрын жауапкершілік аясын және құжаттар жиынтығының толықтығын тексеріңіз.",
-        "en": "Review responsibility scope and document-set completeness before deciding.",
+        "ru": "Проверьте исполнителя, область ответственности и полноту комплекта документов.",
+        "kk": "Орындаушыны, жауапкершілік аясын және құжаттар жиынтығының толықтығын тексеріңіз.",
+        "en": "Review the owner, responsibility scope and completeness of the supplied documents.",
     }[language]
     finding.id = stable_id(
         "finding",

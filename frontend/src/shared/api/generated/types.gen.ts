@@ -487,6 +487,14 @@ export type RunCoverage = {
      * Unreviewed Function Ids
      */
     unreviewed_function_ids: Array<string>;
+    /**
+     * Classified After Functions
+     */
+    classified_after_functions?: number;
+    /**
+     * Unclassified After Function Ids
+     */
+    unclassified_after_function_ids?: Array<string>;
 };
 
 /**
@@ -546,6 +554,10 @@ export type RunDetail = {
      * Finished At
      */
     finished_at: string | null;
+    /**
+     * Resume Available
+     */
+    resume_available?: boolean;
     /**
      * Units
      */
@@ -613,6 +625,10 @@ export type RunResponse = {
      * Finished At
      */
     finished_at: string | null;
+    /**
+     * Resume Available
+     */
+    resume_available?: boolean;
 };
 
 /**
@@ -622,7 +638,7 @@ export type SearchCoverage = {
     /**
      * Method
      */
-    method: 'semantic_all_after_batches';
+    method: 'semantic_all_after_batches' | 'semantic_all_before_batches';
     /**
      * Complete
      */
@@ -765,6 +781,24 @@ export type TranslatedPayload = {
      * Summary
      */
     summary: string;
+    /**
+     * Structure
+     */
+    structure?: Array<TranslatedStructure>;
+};
+
+/**
+ * TranslatedStructure
+ */
+export type TranslatedStructure = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Explanation
+     */
+    explanation: string;
 };
 
 /**
@@ -1419,6 +1453,64 @@ export type GetRunResponses = {
 };
 
 export type GetRunResponse = GetRunResponses[keyof GetRunResponses];
+
+export type ResumeRunData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/runs/{run_id}/resume';
+};
+
+export type ResumeRunErrors = {
+    /**
+     * Not Found
+     */
+    404: ErrorResponse;
+    /**
+     * Conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorResponse;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorResponse;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorResponse;
+    /**
+     * Bad Gateway
+     */
+    502: ErrorResponse;
+    /**
+     * Service Unavailable
+     */
+    503: ErrorResponse;
+    /**
+     * Gateway Timeout
+     */
+    504: ErrorResponse;
+};
+
+export type ResumeRunError = ResumeRunErrors[keyof ResumeRunErrors];
+
+export type ResumeRunResponses = {
+    /**
+     * Successful Response
+     */
+    202: RunAccepted;
+};
+
+export type ResumeRunResponse = ResumeRunResponses[keyof ResumeRunResponses];
 
 export type ListFunctionsData = {
     body?: never;

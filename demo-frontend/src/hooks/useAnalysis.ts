@@ -24,5 +24,5 @@ export function useAnalysis(id: string | undefined) {
     void load();
   }, [load]);
 
-  return { data, error, loading, reload: load };
+  return { data, error, loading, reload: load, replace: setData };
 }

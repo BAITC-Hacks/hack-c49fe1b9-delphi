@@ -12,6 +12,7 @@ from app.schemas import (
     DocumentResponse,
     RunResponse,
 )
+from app.services.checkpoints import resume_available
 from app.services.common import get_or_raise, record
 
 
@@ -58,7 +59,11 @@ class AnalysisService:
                 DocumentResponse(**record(doc, exclude=("storage_key",)), block_count=count)
                 for doc, count in rows
             ],
-            run=RunResponse.model_validate(run) if run else None,
+            run=(
+                RunResponse.model_validate(run).model_copy(
+                    update={"resume_available": resume_available(run)}
+                ) if run else None
+            ),
         )
 
     async def repeat(self, analysis_id: UUID) -> AnalysisResponse:

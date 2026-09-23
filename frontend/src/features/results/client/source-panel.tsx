@@ -9,21 +9,25 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import type { DocumentResponse } from "@/shared/api/generated";
+import type { DocumentResponse, SourceResponse } from "@/shared/api/generated";
+import { sourceLocation } from "@/shared/documents/source-location";
 import { useI18n } from "@/shared/i18n";
 import { resultsApi } from "../api/results-api";
+import { locateEvidence } from "../model/evidence";
 import { RequestError } from "./request-error";
 
 export function SourcePanel({
   sourceId,
   analysisId,
   documents,
+  findingId,
   onClose,
   onSelect,
 }: {
   sourceId: string | null;
   analysisId: string;
   documents: DocumentResponse[];
+  findingId?: string;
   onClose: () => void;
   onSelect: (id: string) => void;
 }) {
@@ -36,17 +40,50 @@ export function SourcePanel({
   const document = documents.find(
     (item) => item.id === source.data?.document_id,
   );
+  const evidence = useQuery({
+    queryKey: ["evidence", findingId],
+    queryFn: () => resultsApi.evidence(findingId!),
+    enabled: Boolean(sourceId && findingId),
+  });
   const context = useQuery({
     queryKey: ["document-sources", analysisId, source.data?.document_id],
     queryFn: () =>
       resultsApi.documentSources(analysisId, source.data!.document_id),
-    enabled: Boolean(sourceId && source.data),
+    enabled: Boolean(sourceId && source.data && document),
   });
   const blocks = context.data ?? [];
   const index = blocks.findIndex((block) => block.id === sourceId);
-  const parent = blocks.find((block) => block.id === source.data?.parent_id);
+  const ancestors: SourceResponse[] = [];
+  const visited = new Set([sourceId]);
+  let parentId = source.data?.parent_id;
+  while (parentId && !visited.has(parentId)) {
+    visited.add(parentId);
+    const parent = blocks.find((block) => block.id === parentId);
+    if (!parent) break;
+    ancestors.unshift(parent);
+    parentId = parent.parent_id;
+  }
   const previous = index > 0 ? blocks[index - 1] : undefined;
   const next = index >= 0 ? blocks[index + 1] : undefined;
+  const originalText = source.data?.original_text ?? "";
+  const ranges = (evidence.data ?? []).filter((item) => item.source_id === sourceId).map((item) =>
+    item.original_text !== originalText ? { invalid: true } as const : locateEvidence(originalText, item),
+  );
+  const invalidEvidence = ranges.some((range) => range && "invalid" in range);
+  const ordered = ranges.filter((range): range is { start: number; end: number } => Boolean(range && !("invalid" in range))).sort((a, b) => a.start - b.start);
+  const merged: { start: number; end: number }[] = [];
+  for (const range of ordered) {
+    const previousRange = merged[merged.length - 1];
+    if (previousRange && range.start <= previousRange.end) previousRange.end = Math.max(previousRange.end, range.end);
+    else merged.push({ ...range });
+  }
+  let cursor = 0;
+  const highlighted = merged.flatMap((range, index) => {
+    const prefix = originalText.slice(cursor, range.start);
+    cursor = range.end;
+    return [prefix, <mark key={index} className="rounded-sm bg-evidence-highlight text-foreground">{originalText.slice(range.start, range.end)}</mark>];
+  });
+  highlighted.push(originalText.slice(cursor));
 
   return (
     <Sheet
@@ -55,7 +92,7 @@ export function SourcePanel({
         if (!open) onClose();
       }}
     >
-      <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
+      <SheetContent className="w-full overflow-y-auto bg-background sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle>
             {t("Исходный пункт", "Бастапқы тармақ", "Original source")}
@@ -83,7 +120,16 @@ export function SourcePanel({
               }}
             />
           ) : null}
-          {source.data ? (
+          {source.data && !document ? (
+            <p role="alert" className="text-sm text-destructive">
+              {t(
+                "Этот источник не принадлежит текущему сравнению.",
+                "Бұл дереккөз ағымдағы салыстыруға жатпайды.",
+                "This source does not belong to the current comparison.",
+              )}
+            </p>
+          ) : null}
+          {source.data && document ? (
             <>
               <p className="text-xs text-muted-foreground">
                 {t(
@@ -92,8 +138,9 @@ export function SourcePanel({
                   "Quotation in its original language",
                 )}
               </p>
-              {parent ? (
-                <div className="rounded-md bg-muted p-3">
+              {document.revision_label ? <p className="text-xs font-medium text-muted-foreground">{document.revision_label} · {sourceLocation(source.data.locator, t)}</p> : null}
+              {ancestors.map((parent) => (
+                <div key={parent.id} className="rounded-md bg-muted p-3">
                   <p className="mb-2 text-xs font-semibold">
                     {t("Родительский пункт", "Жоғарғы тармақ", "Parent clause")}{" "}
                     {parent.clause_no}
@@ -102,9 +149,10 @@ export function SourcePanel({
                     {parent.original_text}
                   </p>
                 </div>
-              ) : null}
-              <blockquote className="whitespace-pre-wrap break-words border-l-2 border-primary pl-4 text-sm leading-relaxed">
-                {source.data.original_text}
+              ))}
+              {invalidEvidence ? <p role="alert" className="text-xs text-status-missing-fg">{t("Границы цитаты не совпадают с источником. Подсветка отключена.", "Дәйексөз шекаралары дереккөзге сәйкес емес. Ерекшелеу өшірілді.", "The evidence does not match this source. Highlighting is unavailable.")}</p> : null}
+              <blockquote className="rounded-lg border bg-card p-4 whitespace-pre-wrap break-words text-sm leading-relaxed [overflow-wrap:anywhere]">
+                {invalidEvidence ? originalText : highlighted}
               </blockquote>
               <details className="text-xs text-muted-foreground">
                 <summary className="cursor-pointer">
@@ -114,9 +162,9 @@ export function SourcePanel({
                     "Document location",
                   )}
                 </summary>
-                <pre className="mt-2 whitespace-pre-wrap break-words">
-                  {JSON.stringify(source.data.locator, null, 2)}
-                </pre>
+                <p className="mt-2 break-words">
+                  {sourceLocation(source.data.locator, t)}
+                </p>
               </details>
               {context.isError ? (
                 <RequestError

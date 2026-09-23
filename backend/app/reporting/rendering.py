@@ -13,7 +13,7 @@ from app.models import (
 from app.reporting.labels import LABELS
 from app.reporting.search import render_search
 from app.reporting.types import ReportSnapshot
-from app.schemas.common import Locale, TranslatedFinding, TranslatedPayload
+from app.schemas.common import Locale, TranslatedFinding, TranslatedPayload, TranslatedStructure
 
 
 def original_payload(snapshot: ReportSnapshot) -> TranslatedPayload:
@@ -31,6 +31,10 @@ def original_payload(snapshot: ReportSnapshot) -> TranslatedPayload:
             for row in snapshot.findings
         ],
         summary=summary,
+        structure=[
+            TranslatedStructure(id=row["id"], explanation=row["explanation"])
+            for row in snapshot.structure
+        ],
     )
 
 
@@ -39,6 +43,10 @@ def validate_translation(snapshot: ReportSnapshot, payload: TranslatedPayload) -
     if Counter(row.id for row in payload.findings) != expected:
         raise DomainError(
             409, "translation_findings_mismatch", "Translation does not match saved finding IDs"
+        )
+    if Counter(row.id for row in payload.structure) != Counter(row["id"] for row in snapshot.structure):
+        raise DomainError(
+            409, "translation_structure_mismatch", "Translation does not match saved structure IDs"
         )
 
 
@@ -85,6 +93,28 @@ def render_report(snapshot: ReportSnapshot, locale: Locale, payload: TranslatedP
         parts.append(
             f"<h2>{labels['errors']}</h2><pre>{escape(json.dumps(snapshot.errors, ensure_ascii=False, indent=2))}</pre>"
         )
+    translated_structure = {row.id: row.explanation for row in payload.structure}
+    if snapshot.structure:
+        parts.append(f"<h2>{labels['structure']}</h2>")
+    for match in snapshot.structure:
+        parts.append(f'<article id="structure-{escape(match["id"])}">')
+        for side in ("before", "after"):
+            identifiers = match[f"{side}_unit_ids"]
+            if any(identifier not in snapshot.units for identifier in identifiers):
+                raise DomainError(409, "invalid_saved_structure", "Structure references unknown units")
+            names = "; ".join(snapshot.units[identifier].name_original for identifier in identifiers)
+            parts.append(f"<p><strong>{labels[side]}:</strong> {escape(names)}</p>")
+        parts.append(f"<p>{escape(translated_structure[match['id']])}</p>")
+        for identifier in match["source_ids"]:
+            source = snapshot.sources.get(UUID(identifier))
+            if source is None:
+                raise DomainError(409, "invalid_saved_structure", "Structure references unknown sources")
+            document = snapshot.documents[source.document_id]
+            parts.append(
+                f"<p>{labels[document.side]} · {escape(document.filename)} · {escape(source.clause_no or str(source.locator))}</p>"
+                f"<blockquote>{escape(source.original_text)}</blockquote><small>{source.id}</small>"
+            )
+        parts.append("</article>")
     for status in ("confirmed", "unreviewed", "needs_clarification", "rejected"):
         group = [row for row in snapshot.findings if snapshot.reviews[row.id].status == status]
         parts.append(f'<section class="{status}"><h2>{labels[status]} ({len(group)})</h2>')

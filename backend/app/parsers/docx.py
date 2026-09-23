@@ -18,8 +18,17 @@ def read_docx(content: bytes) -> tuple[list[TextChunk], list[str]]:
         if child.tag == qn("w:p"):
             paragraph_index += 1
             paragraph = Paragraph(child, document)
+            style = paragraph.style.name.casefold() if paragraph.style is not None else ""
             locator = {"paragraph": paragraph_index, "body_index": body_index}
-            chunks.append(TextChunk(f"paragraph:{paragraph_index}", paragraph.text, locator))
+            chunks.append(
+                TextChunk(
+                    f"paragraph:{paragraph_index}",
+                    paragraph.text,
+                    locator,
+                    heading=style.startswith("heading"),
+                    toc=style.startswith("toc"),
+                )
+            )
             if paragraph._p.pPr is not None and paragraph._p.pPr.numPr is not None:
                 warnings.append(f"automatic_numbering_not_resolved:paragraph:{paragraph_index}")
         elif child.tag == qn("w:tbl"):
@@ -40,7 +49,20 @@ def read_docx(content: bytes) -> tuple[list[TextChunk], list[str]]:
                             "column": column_index,
                             "paragraph": cell_index,
                         }
-                        chunks.append(TextChunk(key, paragraph.text, locator))
+                        style = (
+                            paragraph.style.name.casefold() if paragraph.style is not None else ""
+                        )
+                        chunks.append(
+                            TextChunk(
+                                key,
+                                paragraph.text,
+                                locator,
+                                heading=style.startswith("heading"),
+                                toc=style.startswith("toc"),
+                            )
+                        )
+                        if paragraph._p.pPr is not None and paragraph._p.pPr.numPr is not None:
+                            warnings.append(f"automatic_numbering_not_resolved:{key}")
                     if cell.tables:
                         warnings.append(
                             f"nested_tables_not_extracted:table:{table_index}:row:{row_index}"
@@ -52,6 +74,7 @@ def read_docx(content: bytes) -> tuple[list[TextChunk], list[str]]:
         "w:del": "docx_tracked_changes_not_resolved",
         "w:txbxContent": "docx_textboxes_not_extracted",
         "w:drawing": "docx_drawings_not_extracted",
+        "w:pict": "docx_drawings_not_extracted",
         "w:object": "docx_embedded_objects_not_extracted",
         "w:footnoteReference": "docx_footnotes_not_extracted",
         "w:endnoteReference": "docx_endnotes_not_extracted",

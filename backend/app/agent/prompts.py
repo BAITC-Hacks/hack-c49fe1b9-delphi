@@ -18,6 +18,9 @@ refer to those keys. Every unit and function must cite source IDs from this batc
 Use locator metadata, including Excel column headers and sheet context, to interpret cells.
 Include parent units in the batch when using parent_key. Empty provisions and tables
 of contents contain no duties. Do not fill gaps. A source may contain several duties.
+Every owner_key must identify a returned unit. If the actual actor cannot be established,
+preserve the sourced duty with owner_keys=[] and explicitly state the uncertainty in
+actor_original. Never invent an owner. Return each processed_source_id exactly once.
 """
 )
 
@@ -49,10 +52,23 @@ territories and different objects can explain similar text. An overlap/conflict
 requires at least two distinct After duties with distinct supporting source IDs.
 Do not invent a conflict because a demo expects one. A conflict is a hypothesis for
 human review, never an unsupported assertion of unlawful conduct.
-Also identify genuinely new functions by checking the full Before set. A function
-without a verified match is not automatically new. Structure changes may be reported
+Do not emit new or potentially_missing findings here. The application independently
+searches every raw Before source before a new-duty claim. Structure changes may be reported
 with evidence on both sides. Return all target IDs in reviewed_function_ids even if
 no issue is found. Use change_type='changed' for overlap/conflict findings.
+"""
+)
+
+NEW_SEARCH = (
+    COMMON
+    + """
+The listed After duty may have no earlier counterpart. Semantically inspect EVERY
+Before source in this batch, including its parent context and duties extraction may
+have omitted. Check synonyms, broader/narrower wording, different owners, languages
+and clause numbers. Return every reviewed_source_id exactly once and all plausible
+candidate_source_ids from this batch. Uncertain counterparts are candidates too.
+A lexical non-match is insufficient. An empty list concerns only this supplied batch
+and does not establish when a real organizational activity began.
 """
 )
 

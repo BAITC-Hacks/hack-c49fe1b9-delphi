@@ -56,7 +56,7 @@ function TraceRow({ item, index }: { item: TraceItem; index: number }) {
 }
 
 /** Proof of agency for the jury: readable list of tool calls, not a raw JSON dump (DESIGN.md §4.6). */
-export function TracePanel({ trace }: { trace: TraceItem[] }) {
+export function TracePanel({ trace, note }: { trace: TraceItem[]; /** Shown when the trace is not a recording of a live run. */ note?: string }) {
   const [open, setOpen] = useState(false);
   if (!trace || trace.length === 0) return null;
   const total = trace.reduce((s, t) => s + t.ms, 0);
@@ -68,7 +68,7 @@ export function TracePanel({ trace }: { trace: TraceItem[] }) {
           className="flex w-full items-center gap-2 rounded-lg border bg-card px-4 py-3 text-left text-sm outline-none transition-colors duration-150 hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Wrench className="size-4 text-muted-foreground" aria-hidden="true" />
-          <span className="font-medium">Как агент решал</span>
+          <span className="font-medium">Как агент решал{note ? " · иллюстрация" : ""}</span>
           <span className="text-muted-foreground">
             · {trace.length} {trace.length === 1 ? "вызов" : trace.length < 5 ? "вызова" : "вызовов"} инструментов · {formatMs(total)}
           </span>
@@ -76,6 +76,7 @@ export function TracePanel({ trace }: { trace: TraceItem[] }) {
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
+        {note && <p className="mt-2 text-xs text-muted-foreground">{note}</p>}
         <ol className="mt-2 flex flex-col gap-1.5">
           {trace.map((item, i) => (
             <TraceRow key={i} item={item} index={i} />

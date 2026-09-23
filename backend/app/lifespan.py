@@ -6,6 +6,7 @@ from openai import AsyncOpenAI
 from sqlalchemy import text
 
 from app.agent import AnalysisEngine
+from app.agent.fast import FastAnalysisEngine
 from app.config import Settings, get_settings
 from app.db import create_database
 from app.services.workflow import Workflow
@@ -39,7 +40,8 @@ def application_lifespan(config: Settings | None):
                             timeout=settings.request_timeout_seconds,
                             max_retries=0,
                         )
-                        agent = AnalysisEngine(
+                        engine_type = FastAnalysisEngine if settings.analysis_mode == "fast" else AnalysisEngine
+                        agent = engine_type(
                             client,
                             settings.openai_model,
                             settings.request_timeout_seconds,

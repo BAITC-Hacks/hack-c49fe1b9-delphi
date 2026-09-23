@@ -67,7 +67,9 @@ class ParserRegressionTests(unittest.TestCase):
                 self.assertEqual(by_id[clauses['5.3.3'].parent_id].clause_no, '5.3')
                 self.assertEqual(by_id[clauses['5.4.4'].parent_id].clause_no, '5.4')
                 self.assertEqual(by_id[clauses['9.15'].parent_id].clause_no, '9')
-                self.assertTrue(any(b.kind == 'toc' for b in parsed.blocks))
+                self.assertEqual(sum(b.kind == 'toc' for b in parsed.blocks), 15)
+                self.assertFalse(any(w.startswith('TOC_BOUNDARY_REVIEW:') for w in parsed.warnings))
+                self.assertEqual(sum(b.clause_no == '1' and b.kind != 'toc' for b in parsed.blocks), 1)
                 self.assertTrue(any(w.startswith('APPENDIX_CONTENT_UNAVAILABLE:') for w in parsed.warnings))
 
     def test_synthetic_docx_heading_scope_toc_and_instruction_is_data(self):

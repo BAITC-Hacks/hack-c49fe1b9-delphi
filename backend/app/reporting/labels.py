@@ -1,5 +1,6 @@
 LABELS = {
     "ru": {
+        "structure": "Структура",
         "report": "Заключение Delphi",
         "documents": "Документы",
         "before": "До",
@@ -34,6 +35,8 @@ LABELS = {
         "review": "Проверка",
         "original": "Текст источников и заметки сохранены на исходном языке.",
         "search": "Поиск в предоставленном комплекте «После»",
+        "search_before": "Поиск в предоставленном комплекте «До»",
+        "search_new_incomplete": "Поиск неполный: появление новой функции не установлено",
         "search_complete": "Все доступные источники проверены",
         "search_incomplete": "Поиск неполный: потеря функции не установлена",
         "search_sources": "Проверено исходных блоков",
@@ -41,6 +44,7 @@ LABELS = {
         "search_scope": "Поиск ограничен предоставленными документами и не доказывает прекращения деятельности организации.",
     },
     "kk": {
+        "structure": "Құрылым",
         "report": "Delphi қорытындысы",
         "documents": "Құжаттар",
         "before": "Дейін",
@@ -75,6 +79,8 @@ LABELS = {
         "review": "Тексеру",
         "original": "Дереккөз мәтіні мен ескертпелер бастапқы тілде сақталған.",
         "search": "Берілген «Кейін» құжаттар жиынтығынан іздеу",
+        "search_before": "Берілген «Бұрын» құжаттар жиынтығынан іздеу",
+        "search_new_incomplete": "Іздеу толық емес: жаңа функцияның пайда болуы анықталған жоқ",
         "search_complete": "Барлық қолжетімді дереккөздер тексерілді",
         "search_incomplete": "Іздеу толық емес: функцияның жоғалғаны анықталған жоқ",
         "search_sources": "Тексерілген бастапқы блоктар",
@@ -82,6 +88,7 @@ LABELS = {
         "search_scope": "Іздеу берілген құжаттармен шектеледі және ұйым қызметінің тоқтағанын дәлелдемейді.",
     },
     "en": {
+        "structure": "Structure",
         "report": "Delphi conclusion",
         "documents": "Documents",
         "before": "Before",
@@ -116,6 +123,8 @@ LABELS = {
         "review": "Review",
         "original": "Source quotations and reviewer notes remain in their original language.",
         "search": "Search of the supplied After set",
+        "search_before": "Search of the supplied Before set",
+        "search_new_incomplete": "Search is incomplete: a new duty has not been established",
         "search_complete": "All available sources reviewed",
         "search_incomplete": "Search is incomplete: a missing duty has not been established",
         "search_sources": "Source blocks reviewed",

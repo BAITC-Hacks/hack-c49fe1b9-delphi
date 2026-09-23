@@ -11,21 +11,33 @@ def merge_extraction(
     namespace: str,
 ) -> None:
     source_ids = {source.id for source in batch}
-    if set(result.processed_source_ids) != source_ids:
+    if (
+        len(result.processed_source_ids) != len(source_ids)
+        or set(result.processed_source_ids) != source_ids
+    ):
         raise AgentError("Extraction did not process exactly the supplied source batch")
     side = batch[0].side
     local_keys = {unit.key for unit in result.units}
-    if len(local_keys) != len(result.units):
+    if len(local_keys) != len(result.units) or any(not key.strip() for key in local_keys):
         raise AgentError("Duplicate local unit keys")
     for unit in result.units:
-        if not set(unit.source_ids) <= source_ids or not unit.name_original.strip():
+        if (
+            len(unit.source_ids) != len(set(unit.source_ids))
+            or not set(unit.source_ids) <= source_ids
+            or not unit.name_original.strip()
+        ):
             raise AgentError("Unit cites unknown sources or has no name")
         if unit.parent_key is not None and (
             unit.parent_key not in local_keys or unit.parent_key == unit.key
         ):
             raise AgentError("Invalid parent unit key")
     for function in result.functions:
-        if not set(function.source_ids) <= source_ids or not set(function.owner_keys) <= local_keys:
+        if (
+            len(function.source_ids) != len(set(function.source_ids))
+            or len(function.owner_keys) != len(set(function.owner_keys))
+            or not set(function.source_ids) <= source_ids
+            or not set(function.owner_keys) <= local_keys
+        ):
             raise AgentError("Function cites unknown sources or owners")
         if not function.action.strip() or not function.actor_original.strip():
             raise AgentError("Extracted function has no actor or action")
@@ -69,7 +81,7 @@ def merge_extraction(
     for function in result.functions:
         owner_ids = sorted({key_ids[key] for key in function.owner_keys})
         values = function.model_dump(exclude={"owner_keys", "source_ids"})
-        function_id = stable_id("function", side, owner_ids, values)
+        function_id = stable_id("function", namespace, side, owner_ids, values)
         if function_id in functions:
             functions[function_id].source_ids = sorted(
                 set(functions[function_id].source_ids + function.source_ids)

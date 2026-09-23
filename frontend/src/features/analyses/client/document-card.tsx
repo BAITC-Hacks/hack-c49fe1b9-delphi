@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeftRight, Eye, FileText, Loader2, Save, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, CheckCircle2, Eye, FileText, Loader2, Save, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { confirm } from "@/components/custom-ui/confirm-nice-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -52,15 +52,15 @@ export function DocumentCard({ document, locked, busy, onPreview }: { document: 
   }
 
   return (
-    <article className="min-w-0 rounded-lg border bg-background p-4">
+    <article className="min-w-0 rounded-lg border bg-card p-4">
       <div className="flex items-start gap-3">
-        <FileText className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted"><FileText className="size-4 text-primary" aria-hidden="true" /></div>
         <div className="min-w-0 flex-1">
-          <h3 className="break-words text-sm font-medium">{document.filename}</h3>
+          <h3 className="text-sm font-medium leading-relaxed [overflow-wrap:anywhere]">{document.filename}</h3>
           <p className="mt-1 text-xs text-muted-foreground">{document.format.toUpperCase()} · {document.block_count} {t("текстовых блоков", "мәтіндік блок", "text blocks")}{document.detected_language ? ` · ${document.detected_language.toUpperCase()}` : ""}</p>
         </div>
       </div>
-      <Badge variant={document.parse_status === "failed" ? "destructive" : "outline"} className="mt-3">{statusLabels[document.parse_status]}</Badge>
+      <Badge variant={document.parse_status === "failed" ? "destructive" : "outline"} className={`mt-3 gap-1.5 font-normal ${document.parse_status === "partial" ? "border-status-missing-fg/20 bg-status-missing-bg text-status-missing-fg" : document.parse_status === "parsed" ? "border-status-new-fg/20 bg-status-new-bg text-status-new-fg" : ""}`}>{document.parse_status === "parsed" ? <CheckCircle2 className="size-3" aria-hidden="true" /> : document.parse_status === "partial" || document.parse_status === "failed" ? <AlertTriangle className="size-3" aria-hidden="true" /> : <Loader2 className="size-3 animate-spin" aria-hidden="true" />}{statusLabels[document.parse_status]}</Badge>
       <form className="mt-4 space-y-2" onSubmit={form.handleSubmit(({ revision }) => patch.mutate({ revision_label: revision || null }))}>
         <Label htmlFor={`revision-${document.id}`} className="text-xs">{t("Подпись редакции", "Редакция белгісі", "Revision label")}</Label>
         <div className="flex gap-2">
@@ -70,9 +70,9 @@ export function DocumentCard({ document, locked, busy, onPreview }: { document: 
         {form.formState.errors.revision ? <p className="text-xs text-destructive">{t("Не более 100 символов", "100 таңбадан аспауы керек", "Use 100 characters or fewer")}</p> : null}
       </form>
       {document.warnings.length ? <details className="mt-3 text-xs" open={document.parse_status === "partial"}><summary className="cursor-pointer font-medium">{t("Предупреждения", "Ескертулер", "Parsing notes")} ({document.warnings.length})</summary><ul className="mt-2 space-y-1 pl-4 text-muted-foreground">{document.warnings.map((warning, index) => <li className="list-disc break-words" key={`${warning}-${index}`}>{warningDescription(warning, t)}</li>)}</ul></details> : null}
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t pt-3">
         <Button variant="outline" size="sm" onClick={onPreview} disabled={!document.block_count}><Eye className="size-4" aria-hidden="true" />{t("Текст", "Мәтін", "Preview")}</Button>
-        {!locked ? <><Button variant="ghost" size="sm" disabled={busy || pending} onClick={() => patch.mutate({ side: document.side === "before" ? "after" : "before" })}><ArrowLeftRight className="size-4" aria-hidden="true" />{document.side === "before" ? t("В «После»", "«Кейінге»", "Move to After") : t("В «До»", "«Дейінге»", "Move to Before")}</Button><Button variant="ghost" size="icon" className="text-destructive" disabled={busy || pending} onClick={deleteFile} aria-label={t("Удалить документ", "Құжатты жою", "Remove document")}>{remove.isPending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" aria-hidden="true" />}</Button></> : null}
+        {!locked ? <><Button variant="ghost" size="sm" disabled={busy || pending} onClick={() => patch.mutate({ side: document.side === "before" ? "after" : "before" })}><ArrowLeftRight className="size-4" aria-hidden="true" />{document.side === "before" ? t("В «После»", "«Кейінге»", "Move to After") : t("В «До»", "«Дейінге»", "Move to Before")}</Button><Button variant="ghost" size="icon" className="ml-auto size-8 text-muted-foreground hover:text-destructive" disabled={busy || pending} onClick={deleteFile} aria-label={t("Удалить документ", "Құжатты жою", "Remove document")}>{remove.isPending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" aria-hidden="true" />}</Button></> : null}
       </div>
       {patch.isError || remove.isError ? <p role="alert" className="mt-2 text-xs text-destructive">{getErrorMessage(patch.error ?? remove.error)}</p> : null}
     </article>

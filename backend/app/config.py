@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -23,6 +24,7 @@ class Settings(BaseSettings):
     run_timeout_seconds: float = Field(gt=0)
     max_tool_rounds: int = Field(ge=1, le=12)
     max_batch_chars: int = Field(ge=2000)
+    analysis_mode: Literal["full", "fast"] = "full"
 
     @field_validator("database_url")
     @classmethod

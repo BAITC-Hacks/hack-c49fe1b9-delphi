@@ -27,7 +27,7 @@ IssueType = Literal[
 
 
 class SearchCoverage(BaseModel):
-    method: Literal["semantic_all_after_batches"]
+    method: Literal["semantic_all_after_batches", "semantic_all_before_batches"]
     complete: bool
     reviewed_source_ids: list[UUID]
     candidate_source_ids: list[UUID]

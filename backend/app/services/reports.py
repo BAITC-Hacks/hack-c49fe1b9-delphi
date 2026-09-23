@@ -125,6 +125,7 @@ async def capture_snapshot(db: AsyncSession, run_id: UUID) -> ReportSnapshot:
         sources=sources,
         functions=functions,
         units=units,
+        structure=run.structure,
     )
 
 

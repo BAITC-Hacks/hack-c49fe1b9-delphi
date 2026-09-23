@@ -1179,6 +1179,119 @@
         }
       }
     },
+    "/api/runs/{run_id}/resume": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Resume Run",
+        "operationId": "resume_run",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunAccepted"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      }
+    },
     "/api/runs/{run_id}/functions": {
       "get": {
         "tags": [
@@ -3106,6 +3219,19 @@
             },
             "type": "array",
             "title": "Unreviewed Function Ids"
+          },
+          "classified_after_functions": {
+            "type": "integer",
+            "title": "Classified After Functions",
+            "default": 0
+          },
+          "unclassified_after_function_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Unclassified After Function Ids"
           }
         },
         "type": "object",
@@ -3232,6 +3358,11 @@
               }
             ],
             "title": "Finished At"
+          },
+          "resume_available": {
+            "type": "boolean",
+            "title": "Resume Available",
+            "default": false
           },
           "units": {
             "items": {
@@ -3371,6 +3502,11 @@
               }
             ],
             "title": "Finished At"
+          },
+          "resume_available": {
+            "type": "boolean",
+            "title": "Resume Available",
+            "default": false
           }
         },
         "type": "object",
@@ -3396,7 +3532,10 @@
         "properties": {
           "method": {
             "type": "string",
-            "const": "semantic_all_after_batches",
+            "enum": [
+              "semantic_all_after_batches",
+              "semantic_all_before_batches"
+            ],
             "title": "Method"
           },
           "complete": {
@@ -3645,6 +3784,13 @@
           "summary": {
             "type": "string",
             "title": "Summary"
+          },
+          "structure": {
+            "items": {
+              "$ref": "#/components/schemas/TranslatedStructure"
+            },
+            "type": "array",
+            "title": "Structure"
           }
         },
         "additionalProperties": false,
@@ -3654,6 +3800,25 @@
           "summary"
         ],
         "title": "TranslatedPayload"
+      },
+      "TranslatedStructure": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "explanation"
+        ],
+        "title": "TranslatedStructure"
       },
       "TranslationResponse": {
         "properties": {

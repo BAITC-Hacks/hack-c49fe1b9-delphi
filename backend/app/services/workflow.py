@@ -7,7 +7,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.agent import AnalysisEngine
+from app.agent.models import AnalysisOutput
 from app.models import Run
+from app.services.checkpoints import clear_generated_result, load_checkpoint, save_checkpoint
 from app.services.results import persist_result
 from app.services.sources import load_run_sources
 
@@ -35,24 +37,30 @@ class Workflow:
     def enqueue(self, run_id: UUID) -> None:
         if not self.available:
             raise RuntimeError("The analysis worker is unavailable")
-        if run_id not in self._tasks:
-            task = asyncio.create_task(self._execute(run_id), name=f"analysis-{run_id}")
-            self._tasks[run_id] = task
-            task.add_done_callback(lambda _: self._tasks.pop(run_id, None))
+        previous = self._tasks.get(run_id)
+        if previous is not None and not previous.done():
+            # A stopped result can become visible just before its task exits.
+            # Resume must not disappear in that small window.
+            previous.add_done_callback(lambda _: self.enqueue(run_id) if self.available else None)
+            return
+        task = asyncio.create_task(self._execute(run_id), name=f"analysis-{run_id}")
+        self._tasks[run_id] = task
+
+        def finished(_: asyncio.Task) -> None:
+            if self._tasks.get(run_id) is task:
+                self._tasks.pop(run_id, None)
+
+        task.add_done_callback(finished)
 
     async def recover_interrupted(self) -> None:
         async with self.sessions() as db:
-            runs = (
+            run_ids = (
                 await db.scalars(
-                    select(Run).where(Run.state.in_(["queued", "running"])).with_for_update()
+                    select(Run.id).where(Run.state.in_(["queued", "running"]))
                 )
             ).all()
-            for run in runs:
-                run.state = "interrupted"
-                run.stage = "interrupted"
-                run.finished_at = datetime.now(UTC)
-                run.errors = [*run.errors, "Application restarted before the run completed"]
-            await db.commit()
+        for run_id in run_ids:
+            await self._fail(run_id, "interrupted", "Application restarted before the run completed")
 
     async def close(self) -> None:
         self._closing = True
@@ -89,6 +97,7 @@ class Workflow:
             run.started_at = datetime.now(UTC)
             sources = await load_run_sources(db, run)
             language = run.output_language
+            resume = load_checkpoint(run, sources) if run.checkpoint else None
             await db.commit()
 
         async def progress(stage: str, coverage: dict) -> None:
@@ -100,11 +109,24 @@ class Workflow:
                 run.coverage = {**run.coverage, **coverage}
                 await db.commit()
 
-        result = await self.agent.analyze(sources, language, progress)
+        async def checkpoint(stage: str, output: AnalysisOutput) -> None:
+            async with self.sessions() as db:
+                run = await db.scalar(select(Run).where(Run.id == run_id).with_for_update())
+                if run is None or run.state != "running":
+                    raise RuntimeError("Run is no longer active")
+                save_checkpoint(run, output, sources)
+                run.stage = stage
+                run.coverage = {**run.coverage, **output.coverage}
+                await db.commit()
+
+        result = await self.agent.analyze(
+            sources, language, progress, checkpoint=checkpoint, resume=resume
+        )
         async with self.sessions() as db:
             run = await db.scalar(select(Run).where(Run.id == run_id).with_for_update())
             if run is None or run.state != "running":
                 raise RuntimeError("Run is no longer active")
+            save_checkpoint(run, result, sources)
             await persist_result(db, run, result, sources)
             run.finished_at = datetime.now(UTC)
             await db.commit()
@@ -112,12 +134,26 @@ class Workflow:
     async def _fail(self, run_id: UUID, state: str, message: str) -> None:
         try:
             async with self.sessions() as db:
-                run = await db.get(Run, run_id)
+                run = await db.scalar(select(Run).where(Run.id == run_id).with_for_update())
                 if run is not None and run.state in {"queued", "running"}:
-                    run.state = state
-                    run.stage = state
+                    if run.checkpoint:
+                        sources = await load_run_sources(db, run)
+                        try:
+                            output = load_checkpoint(run, sources)
+                        except (ValueError, KeyError):
+                            run.state = state
+                            run.stage = state
+                            run.errors = [*run.errors, message, "Saved checkpoint validation failed"]
+                        else:
+                            output.partial = True
+                            output.errors = [*output.errors, message]
+                            await clear_generated_result(db, run)
+                            await persist_result(db, run, output, sources)
+                    else:
+                        run.state = state
+                        run.stage = state
+                        run.errors = [*run.errors, message]
                     run.finished_at = datetime.now(UTC)
-                    run.errors = [*run.errors, message]
                     await db.commit()
         except Exception:
             logger.exception("Could not persist run failure: %s", run_id)

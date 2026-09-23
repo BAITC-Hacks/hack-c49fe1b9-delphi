@@ -284,7 +284,10 @@ def _build_blocks(raw_blocks: Iterator[_RawBlock], document_id: str, side: Side,
             # are Heading rather than TOC and whose Markdown lines are bold.
             leader_page = bool(re.search(r"(?:\.{2,}|…{2,}|[·•]{2,}|\t+)\s*\d+\s*$", original))
             repeated_paginated_heading = False
-            if in_toc and raw.heading and clause_no in by_number and len(normalized) <= 240 and re.search(r"\s\d+\s*$", normalized):
+            # Custom Word styles (for example RegHeading1) need not inherit
+            # Heading. A previously seen numbered top-level heading is also
+            # eligible, but only with matching title and an explicit page suffix.
+            if in_toc and (raw.heading or len(parts) == 1) and clause_no in by_number and len(normalized) <= 240 and re.search(r"\s\d+\s*$", normalized):
                 previous = by_number[clause_no]
                 previous_number = _START_NUMBER.match(previous.normalized_text)
                 if previous_number and previous.kind == "heading":

@@ -10,6 +10,7 @@ import {
   listFindings,
   listFunctions,
   repeatAnalysis,
+  resumeRun,
   updateFindingReview,
 } from "@/shared/api/generated";
 import type { RunDetail, UpdateReview } from "@/shared/api/generated";
@@ -44,6 +45,8 @@ export const resultsApi = {
     ),
   repeat: async (id: string) =>
     unwrap(await repeatAnalysis({ path: { analysis_id: id } })),
+  resume: async (id: string) =>
+    unwrap(await resumeRun({ path: { run_id: id } })),
   report: async (id: string, locale: Locale) =>
     unwrap(
       await getReport({

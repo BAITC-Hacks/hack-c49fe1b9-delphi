@@ -1,3 +1,5 @@
+import re
+
 from .types import ParseError, TextChunk
 
 
@@ -9,12 +11,16 @@ def read_markdown(content: bytes) -> tuple[list[TextChunk], list[str]]:
     if "\x00" in text:
         raise ParseError("invalid_format", "The Markdown file contains binary data.")
     chunks = []
+    warnings = ["markdown_images_not_extracted"] if re.search(r"!\[[^\]]*\]\(", text) else []
     offset = 0
     for number, line in enumerate(text.splitlines(keepends=True), 1):
         chunks.append(
             TextChunk(
-                f"line:{number}", line.rstrip("\r\n"), {"line": number, "document_offset": offset}
+                f"line:{number}",
+                line.rstrip("\r\n"),
+                {"line": number, "document_offset": offset},
+                heading=bool(re.match(r"^\s*#{1,6}\s|^\s*\*\*.*\*\*\s*$", line)),
             )
         )
         offset += len(line)
-    return chunks, []
+    return chunks, warnings

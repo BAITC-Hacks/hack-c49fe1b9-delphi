@@ -50,6 +50,11 @@ TOOLS = [
             "offset": {"type": "integer", "minimum": 0},
         },
     ),
+    tool_schema(
+        "check_references",
+        "Locate numbered internal references in one document; no semantic verdict.",
+        {"document_id": {"type": "string"}, "offset": {"type": "integer", "minimum": 0}},
+    ),
 ]
 
 
@@ -102,6 +107,9 @@ class SourceTools:
                 "total_matches": len(ranked),
                 "offset": offset,
                 "has_more": offset + 12 < len(ranked),
+                "next_offset": offset + len(selected)
+                if offset + len(selected) < len(ranked)
+                else None,
                 "method": "lexical",
             }
             trace = {
@@ -131,11 +139,65 @@ class SourceTools:
                 "functions": [function.model_dump() for function in selected],
                 "total": len(matches),
                 "has_more": offset + 20 < len(matches),
+                "offset": offset,
+                "next_offset": offset + len(selected)
+                if offset + len(selected) < len(matches)
+                else None,
             }
             trace = {
                 "tool": name,
                 "unit_id": args["unit_id"],
                 "function_ids": [function.id for function in selected],
+            }
+        elif name == "check_references":
+            self._keys(args, {"document_id", "offset"})
+            if (
+                not isinstance(args["document_id"], str)
+                or type(args["offset"]) is not int
+                or args["offset"] < 0
+            ):
+                raise AgentError("Invalid reference document or offset")
+            sources = [
+                source
+                for source in self.sources.values()
+                if source.document_id == args["document_id"]
+            ]
+            if not sources:
+                raise AgentError("Unknown document in check_references")
+            targets: dict[str, list[str]] = {}
+            for source in sources:
+                if source.clause_no:
+                    targets.setdefault(source.clause_no.rstrip("."), []).append(source.id)
+            references = []
+            for source in sources:
+                for match in re.finditer(
+                    r"(?i)(?:пункт\w*|пп?\.|clauses?|sections?|тармақ\w*)\s*(\d+(?:\.\d+)+)",
+                    source.text,
+                ):
+                    number = match.group(1).rstrip(".")
+                    references.append(
+                        {
+                            "source_id": source.id,
+                            "reference": number,
+                            "target_ids": targets.get(number, []),
+                        }
+                    )
+            offset = args["offset"]
+            selected = references[offset : offset + 20]
+            result = {
+                "references": selected,
+                "total": len(references),
+                "offset": offset,
+                "has_more": offset + len(selected) < len(references),
+                "next_offset": offset + len(selected)
+                if offset + len(selected) < len(references)
+                else None,
+                "semantic_check": "not performed",
+            }
+            trace = {
+                "tool": name,
+                "document_id": args["document_id"],
+                "source_ids": [item["source_id"] for item in selected],
             }
         else:
             raise AgentError(f"Unknown tool: {name}")

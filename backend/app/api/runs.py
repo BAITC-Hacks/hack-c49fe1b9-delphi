@@ -27,6 +27,18 @@ async def get_run(run_id: UUID, db: DB) -> RunDetail:
     return await RunService(db).get(run_id)
 
 
+@router.post(
+    "/api/runs/{run_id}/resume",
+    status_code=202,
+    response_model=RunAccepted,
+    operation_id="resume_run",
+)
+async def resume_run(run_id: UUID, request: Request, db: DB) -> RunAccepted:
+    return await RunService(db).resume(
+        run_id, request.app.state.settings, request.app.state.workflow
+    )
+
+
 @router.get(
     "/api/runs/{run_id}/functions",
     response_model=list[FunctionResponse],

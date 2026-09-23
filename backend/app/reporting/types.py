@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from uuid import UUID
 
 from app.models import (
@@ -28,6 +28,7 @@ class ReportSnapshot:
     sources: dict[UUID, SourceBlock]
     functions: list[Function]
     units: dict[str, Unit]
+    structure: list[dict] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

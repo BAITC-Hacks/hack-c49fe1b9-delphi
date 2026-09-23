@@ -122,15 +122,15 @@ def mark_incomplete_input(output: AnalysisOutput, language: str) -> None:
     messages = {
         "ru": (
             "Соответствие требует проверки",
-            "Часть документов прочитана не полностью. Потеря функции не установлена.",
+            "Часть документов прочитана не полностью. Потеря или появление функции не установлены.",
         ),
         "kk": (
             "Сәйкестікті тексеру қажет",
-            "Құжаттардың бір бөлігі толық оқылмады. Функцияның жоғалғаны анықталған жоқ.",
+            "Құжаттардың бір бөлігі толық оқылмады. Функцияның жоғалуы немесе пайда болуы анықталған жоқ.",
         ),
         "en": (
             "Function mapping needs review",
-            "Some documents were not fully read. A missing duty has not been established.",
+            "Some documents were not fully read. A missing or new duty has not been established.",
         ),
     }
     recommendations = {
@@ -141,7 +141,7 @@ def mark_incomplete_input(output: AnalysisOutput, language: str) -> None:
     if language not in messages:
         raise ValueError("Unsupported result language")
     for finding in output.findings:
-        if finding.change_type != "potentially_missing":
+        if finding.change_type not in {"potentially_missing", "new"}:
             continue
         finding.change_type = "changed"
         finding.issue_type = "insufficient_evidence"

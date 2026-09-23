@@ -37,7 +37,9 @@ test("structure mappings preserve source context and source navigation", async (
     dataSource: resultDataSource,
   });
 
-  await row.getByRole("button", { name: "Source 1", exact: true }).click();
+  await row.getByRole("button", {
+    name: "Before · Synthetic revision 1 · 1.1", exact: true,
+  }).click();
   const source = page.getByRole("dialog", { name: "Original source · 1.1" });
   await expect(
     source.getByText(originalBeforeQuote, { exact: true }),
@@ -114,8 +116,10 @@ test("findings support URL filters, evidence, review persistence and report expo
 
   const note =
     "Verified with both department owners.\nQuarterly responsibility is retained.";
-  await evidence.getByRole("combobox", { name: "Decision" }).click();
-  await page.getByRole("option", { name: "Confirmed", exact: true }).click();
+  await evidence.getByRole("button", { name: "Confirmed", exact: true }).click();
+  await expect(
+    evidence.getByRole("button", { name: "Confirmed", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await evidence.getByRole("textbox", { name: "Note", exact: true }).fill(note);
   await evidence.getByRole("button", { name: "Save review" }).click();
   await expect(
@@ -131,9 +135,12 @@ test("findings support URL filters, evidence, review persistence and report expo
   await expect(
     evidence.getByRole("textbox", { name: "Note", exact: true }),
   ).toHaveValue(note);
-  await expect(evidence.getByRole("combobox", { name: "Decision" })).toHaveText(
-    "Confirmed",
-  );
+  await expect(
+    evidence.getByRole("button", { name: "Confirmed", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    evidence.getByRole("button", { name: "Unreviewed", exact: true }),
+  ).toHaveAttribute("aria-pressed", "false");
   await page.getByRole("tab", { name: "Conclusion", exact: true }).click();
   const report = page.frameLocator('iframe[title="Report preview"]');
   await expect(
@@ -287,6 +294,12 @@ test("active runs poll and failed runs explain why results are unavailable", asy
   });
   fixture.run.state = "failed";
   fixture.run.stage = "failed";
+  fixture.run.units = [];
+  fixture.run.structure = [];
+  fixture.run.finding_count = 0;
+  fixture.run.resume_available = false;
+  fixture.findings.length = 0;
+  fixture.functions.length = 0;
   fixture.run.errors = [
     "Synthetic fixture: provider unavailable; no result saved.",
   ];
@@ -296,7 +309,7 @@ test("active runs poll and failed runs explain why results are unavailable", asy
   ).toBeVisible();
   await expect(
     page.getByText(
-      "A usable result was not produced. Review the errors above and create a new draft to retry.",
+      "No findings have been saved yet. Review the errors above, then continue if available or create a new draft.",
       { exact: true },
     ),
   ).toBeVisible();
@@ -340,5 +353,102 @@ test("invalid finding links and empty filters have explicit recoverable states",
   await expect(
     page.getByRole("button", { name: transferTitle, exact: true }),
   ).toBeVisible();
+  expect(fixture.unhandled).toEqual([]);
+});
+
+test("review queue preserves a linked finding outside its current filters", async ({
+  page,
+}, testInfo) => {
+  const fixture = await installResultRoutes(page);
+  await page.goto(
+    `${resultPath}?view=review&change=potentially_missing&finding=${resultIds.transfer}`,
+  );
+  const queue = page.getByRole("region", { name: "Review queue", exact: true });
+  await expect(queue.getByText("1 findings · priority first", { exact: true })).toBeVisible();
+  const evidence = queue.getByRole("region", { name: "Finding evidence" });
+  await expect(
+    evidence.getByRole("heading", { name: transferTitle, exact: true }),
+  ).toBeVisible();
+  await expect(evidence.getByText(originalBeforeQuote, { exact: true })).toBeVisible();
+  await expect(evidence.getByText(originalAfterQuote, { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`finding=${resultIds.transfer}`));
+  await capturePage(page, testInfo, {
+    slug: "results-review-queue-linked-finding",
+    name: "Analysis · Linked finding outside queue filters",
+    description:
+      "A queue deep link preserves its requested finding and original evidence even when the queue filter excludes it.",
+    dataSource: resultDataSource,
+  });
+  await page.reload();
+  await expect(
+    evidence.getByRole("heading", { name: transferTitle, exact: true }),
+  ).toBeVisible();
+  expect(
+    fixture.requests.filter((request) => request.path.endsWith("/evidence"))
+      .every((request) => request.path === `/api/findings/${resultIds.transfer}/evidence`),
+  ).toBe(true);
+  expect(fixture.unhandled).toEqual([]);
+});
+
+test("invalid review queue links never substitute another finding's evidence", async ({
+  page,
+}) => {
+  const fixture = await installResultRoutes(page);
+  await page.goto(`${resultPath}?view=review&finding=unknown-finding`);
+  await expect(
+    page.getByText(
+      "The linked finding does not belong to this analysis or no longer exists.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  const queue = page.getByRole("region", { name: "Review queue", exact: true });
+  await expect(queue.getByText("3 findings · priority first", { exact: true })).toBeVisible();
+  await expect(queue.getByRole("region", { name: "Finding evidence" })).toHaveCount(0);
+  expect(fixture.requests.filter((request) => request.path.endsWith("/evidence"))).toEqual([]);
+  await page.getByRole("button", { name: "Clear selection", exact: true }).click();
+  await expect(page).not.toHaveURL(/finding=/);
+  await expect(
+    queue.getByRole("region", { name: "Finding evidence" })
+      .getByRole("heading", { name: fixture.findings[2].title, exact: true }),
+  ).toBeVisible();
+  expect(fixture.unhandled).toEqual([]);
+});
+
+test("copied finding links clear queue filters and reopen the requested evidence", async ({
+  page,
+  context,
+}) => {
+  const fixture = await installResultRoutes(page);
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  const filters = new URLSearchParams({
+    view: "review",
+    q: "полноту",
+    change: "potentially_missing",
+    issue: "insufficient_evidence",
+    review: "unreviewed",
+    unit: resultIds.beforeUnit,
+    finding: resultIds.transfer,
+  });
+  await page.goto(`${resultPath}?${filters}`);
+  const evidence = page.getByRole("region", { name: "Finding evidence" });
+  await expect(
+    evidence.getByRole("heading", { name: transferTitle, exact: true }),
+  ).toBeVisible();
+  await evidence.getByRole("button", { name: "Copy link", exact: true }).click();
+  await expect(page.getByText("Link copied", { exact: true })).toBeVisible();
+  const link = new URL(await page.evaluate(() => navigator.clipboard.readText()));
+  expect(link.origin).toBe(new URL(page.url()).origin);
+  expect(link.pathname).toBe(resultPath);
+  expect(link.searchParams.get("finding")).toBe(resultIds.transfer);
+  expect(link.searchParams.get("tab")).toBe("functions");
+  for (const key of ["q", "change", "issue", "review", "unit", "source"]) {
+    expect(link.searchParams.has(key), `Copied link must clear ${key}`).toBe(false);
+  }
+  await page.goto(link.href);
+  await expect(
+    evidence.getByRole("heading", { name: transferTitle, exact: true }),
+  ).toBeVisible();
+  await expect(evidence.getByText(originalBeforeQuote, { exact: true })).toBeVisible();
+  await expect(evidence.getByText(originalAfterQuote, { exact: true })).toBeVisible();
   expect(fixture.unhandled).toEqual([]);
 });

@@ -1,6 +1,7 @@
 import re
 import unicodedata
 
+from .limits import MAX_BLOCKS, MAX_SEGMENT_CHARS, MAX_TEXT_CHARS
 from .types import ParsedBlock, ParsedDocument, ParseError, TextChunk
 
 NUMBER = re.compile(
@@ -9,7 +10,6 @@ NUMBER = re.compile(
 LIST_MARKER = re.compile(r"^[\s*#_>]*(?:\\)?(?P<marker>[a-zа-яәғқңөұүһі])[.)]\s+", re.I)
 REFERENCE = re.compile(r"(?:\bпп?\.|\bпункт[а-я]*|\bраздел[а-я]*|\bclause|\bsection)\s*$", re.I)
 TOC_TITLE = {"оглавление", "содержание", "table of contents", "contents", "мазмұны"}
-TOC_ENTRY = re.compile(r"^\d+(?:\.\d+)*\.?\s+.+\s\d+\s*$")
 
 
 def normalize(text: str) -> str:
@@ -57,52 +57,130 @@ def _boundaries(text: str) -> list[tuple[int, str | None, int]]:
 
 def assemble(chunks: list[TextChunk], warnings: list[str]) -> ParsedDocument:
     blocks: list[ParsedBlock] = []
-    known_clauses: dict[str, str] = {}
-    current_clause: str | None = None
+    known_clauses: dict[str, ParsedBlock] = {}
+    chunk_roots: dict[str, str] = {}
+    numbered: ParsedBlock | None = None
+    unnumbered_heading: ParsedBlock | None = None
+    heading_anchor: str | None = None
+    section: str | None = None
     toc = False
+    total_chars = 0
     annexes: list[tuple[int, str]] = []
     for chunk in chunks:
+        total_chars += len(chunk.text)
+        if total_chars > MAX_TEXT_CHARS:
+            raise ParseError("text_limit", "The extracted document text exceeds the parser limit.")
         if not chunk.text.strip():
             continue
         heading = plain_heading(chunk.text)
-        if heading in TOC_TITLE:
+        if heading in TOC_TITLE or chunk.toc:
             toc = True
             warnings.append(f"table_of_contents_skipped:{chunk.key}")
             continue
         if toc:
-            if TOC_ENTRY.fullmatch(heading) or re.fullmatch(r".+\.{3,}\s*\d+", heading):
+            leader_page = bool(re.search(r"(?:\.{2,}|…{2,}|[·•]{2,}|\t+)\s*\d+\s*$", chunk.text))
+            repeated_heading = False
+            candidate = re.match(r"^(\d+)\.?\s+(.+?)\s+\d+(?:\s+.*)?$", heading)
+            if candidate and len(heading) <= 240 and candidate[1] in known_clauses:
+                previous = known_clauses[candidate[1]]
+                previous_title = re.sub(r"^\d+\.\s*", "", previous.normalized_text)
+                repeated_heading = previous_title.startswith(candidate[2])
+            if leader_page or repeated_heading:
                 continue
             toc = False
+            if heading not in {"приложения", "appendices", "appendix", "қосымшалар"}:
+                warnings.append(f"toc_boundary_requires_review:{chunk.key}")
         annex = re.match(r"(?:приложение|annex|appendix|қосымша)\s+(\d+)", heading)
         if annex:
             annexes.append((len(blocks), annex.group(1)))
-        boundaries = _boundaries(chunk.text)
+        boundaries = _boundaries(chunk.text) if chunk.clause_numbers else [(0, None, 0)]
+        bounded = []
+        for index, (start, clause, content_start) in enumerate(boundaries):
+            end = boundaries[index + 1][0] if index + 1 < len(boundaries) else len(chunk.text)
+            bounded.append((start, clause, content_start))
+            while end - start > MAX_SEGMENT_CHARS:
+                boundary = chunk.text.rfind(
+                    " ", start + MAX_SEGMENT_CHARS // 2, start + MAX_SEGMENT_CHARS
+                )
+                start = boundary if boundary > start else start + MAX_SEGMENT_CHARS
+                bounded.append((start, None, start))
+        boundaries = bounded
         for index, (start, clause, content_start) in enumerate(boundaries):
             end = boundaries[index + 1][0] if index + 1 < len(boundaries) else len(chunk.text)
             original = chunk.text[start:end]
             if not original.strip():
                 continue
+            if len(blocks) >= MAX_BLOCKS:
+                raise ParseError("block_limit", "The document has too many extracted blocks.")
             key = f"{chunk.key}:{start}-{end}"
-            parent_key = known_clauses.get(current_clause) if current_clause else None
+            normalized = normalize(original)
+            is_heading = chunk.heading or (normalized.endswith(":") and len(normalized) <= 300)
+            parent_key = (
+                numbered.key if numbered else unnumbered_heading.key if unnumbered_heading else None
+            )
             if clause:
                 parts = clause.split(".")
+                is_heading = is_heading or len(parts) == 1
                 parent_key = None
                 for depth in range(len(parts) - 1, 0, -1):
                     prefix = ".".join(parts[:depth])
                     if prefix in known_clauses:
-                        parent_key = known_clauses[prefix]
+                        parent_key = known_clauses[prefix].key
                         break
-                known_clauses[clause] = key
-                current_clause = clause
+                if len(parts) == 1:
+                    section = clause
+                    unnumbered_heading = None
+                    heading_anchor = None
+                elif unnumbered_heading:
+                    inside_anchor = bool(heading_anchor and clause.startswith(heading_anchor + "."))
+                    remainder = chunk.text[content_start:end].strip()
+                    explicit_role = bool(
+                        re.search(
+                            r"^(?:(?:главный|chief|audit|senior|бас)\s+)?(?:директор\w*|руководител\w*|начальник\w*|аудитор\w*|director|head|manager|auditor|басшы\w*)\b",
+                            remainder,
+                            re.I,
+                        )
+                    ) and not re.search(
+                        r"\b(?:обязан\w*|долж\w*|вправе|must|shall|may|міндет\w*)\b",
+                        remainder,
+                        re.I,
+                    )
+                    if (is_heading and (chunk.heading or explicit_role)) or not inside_anchor:
+                        unnumbered_heading = None
+                        heading_anchor = None
+                    elif parent_key == unnumbered_heading.parent_key:
+                        parent_key = unnumbered_heading.key
                 if not any(char.isalnum() for char in chunk.text[content_start:end]):
                     warnings.append(f"empty_clause:{clause}")
+            elif is_heading:
+                parent_key = (
+                    numbered.key
+                    if numbered
+                    else known_clauses[section].key
+                    if section in known_clauses
+                    else None
+                )
+            if not chunk.clause_numbers:
+                # Spreadsheet headers are explicit context, never numbered clauses
+                # or descendants of the last row on a different sheet.
+                parent_key = chunk_roots.get(chunk.context_key) if chunk.context_key else None
             locator = {**chunk.locator, "start_offset": start, "end_offset": end}
             marker = LIST_MARKER.match(original)
             if marker:
                 locator["list_marker"] = marker.group("marker")
-            blocks.append(
-                ParsedBlock(key, clause, parent_key, original, normalize(original), locator)
-            )
+            block = ParsedBlock(key, clause, parent_key, original, normalized, locator)
+            blocks.append(block)
+            chunk_roots.setdefault(chunk.key, key)
+            if clause:
+                known_clauses[clause] = block
+                numbered = block
+            elif is_heading:
+                unnumbered_heading = block
+                anchor = next(
+                    (item for item in reversed(blocks[:-1]) if item.key == parent_key), None
+                )
+                heading_anchor = anchor.clause_no if anchor else None
+                numbered = None
     if not blocks or not any(
         any(char.isalnum() for char in block.original_text) for block in blocks
     ):

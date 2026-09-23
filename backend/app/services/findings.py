@@ -71,6 +71,8 @@ class FindingService:
         run = await self.db.scalar(select(Run).where(Run.id == finding.run_id).with_for_update())
         if run is None:
             raise DomainError(409, "incomplete_saved_result", "The finding run is missing")
+        if run.state not in {"completed", "partial"}:
+            raise DomainError(409, "run_not_finished", "Review requires a stopped saved result")
         review = await self.db.get(Review, finding_id)
         if review is None:
             raise DomainError(

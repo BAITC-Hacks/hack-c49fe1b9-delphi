@@ -2,16 +2,11 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Check, Circle, HelpCircle, Save, X } from "lucide-react";
+import { useId } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/shared/api/errors";
 import type { FindingResponse, RunDetail } from "@/shared/api/generated";
@@ -24,17 +19,23 @@ import { reviewSchema, type ReviewInput } from "../model/review";
 export function ReviewForm({
   finding,
   analysisId,
+  disabled = false,
+  onReviewSaved,
 }: {
   finding: FindingResponse;
   analysisId: string;
+  disabled?: boolean;
+  onReviewSaved?: (findingId: string) => void;
 }) {
   const { t } = useI18n();
   const client = useQueryClient();
+  const noteId = useId();
   const form = useForm<ReviewInput>({
     resolver: zodResolver(reviewSchema),
     defaultValues: { status: finding.review.status, note: finding.review.note },
   });
   const mutation = useMutation({
+    mutationKey: ["review", finding.run_id],
     mutationFn: (values: ReviewInput) => resultsApi.review(finding.id, values),
     onSuccess: async (review) => {
       form.reset({ status: review.status, note: review.note });
@@ -42,6 +43,7 @@ export function ReviewForm({
         current
           ? {
               ...current,
+              resume_available: false,
               review_revision: Math.max(
                 current.review_revision,
                 review.review_revision,
@@ -63,6 +65,7 @@ export function ReviewForm({
       toast.success(
         t("Проверка сохранена", "Тексеру сақталды", "Review saved"),
       );
+      onReviewSaved?.(finding.id);
     },
     onError: (error) => {
       const message = getErrorMessage(error);
@@ -73,8 +76,9 @@ export function ReviewForm({
 
   return (
     <form
-      className="space-y-3 border-t pt-4"
+      className="space-y-4 rounded-lg border bg-muted/20 p-4"
       onSubmit={form.handleSubmit((values) => {
+        if (disabled) return;
         form.clearErrors("root");
         mutation.mutate(values);
       })}
@@ -82,40 +86,31 @@ export function ReviewForm({
       <h4 className="text-sm font-semibold">
         {t("Проверка человеком", "Адамның тексеруі", "Human review")}
       </h4>
-      <div className="space-y-2">
-        <Label htmlFor="review-status">
-          {t("Решение", "Шешім", "Decision")}
-        </Label>
+      <fieldset className="space-y-2" disabled={disabled || mutation.isPending}>
+        <legend className="mb-2 text-xs text-muted-foreground">{t("Решение", "Шешім", "Decision")}</legend>
         <Controller
           control={form.control}
           name="status"
           render={({ field }) => (
-            <Select
-              value={field.value}
-              onValueChange={field.onChange}
-              disabled={mutation.isPending}
-            >
-              <SelectTrigger id="review-status" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {reviewStatuses.map((status) => (
-                  <SelectItem value={status} key={status}>
-                    {reviewLabel(status, t)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex flex-wrap gap-2">
+              {reviewStatuses.map((status) => {
+                const Icon = { unreviewed: Circle, confirmed: Check, needs_clarification: HelpCircle, rejected: X }[status];
+                return <Button type="button" size="sm" variant={field.value === status ? "default" : "outline"} key={status}
+                  aria-pressed={field.value === status} disabled={disabled || mutation.isPending}
+                  onClick={() => field.onChange(status)}><Icon className="size-3.5" aria-hidden="true" />{reviewLabel(status, t)}</Button>;
+              })}
+            </div>
           )}
         />
-      </div>
+      </fieldset>
       <div className="space-y-2">
-        <Label htmlFor="review-note">{t("Заметка", "Ескертпе", "Note")}</Label>
+        <Label htmlFor={noteId}>{t("Заметка", "Ескертпе", "Note")}</Label>
         <Textarea
-          id="review-note"
-          rows={4}
+          id={noteId}
+          rows={3}
+          placeholder={t("Что уточнить, у кого или почему вывод отклонён…", "Нені, кімнен нақтылау керек немесе қорытынды неге қабылданбады…", "What to clarify, with whom, or why the finding is rejected…")}
           maxLength={4_000}
-          disabled={mutation.isPending}
+          disabled={disabled || mutation.isPending}
           {...form.register("note")}
         />
         {form.formState.errors.note ? (
@@ -135,8 +130,9 @@ export function ReviewForm({
       ) : null}
       <Button
         type="submit"
-        disabled={mutation.isPending || !form.formState.isDirty}
+        disabled={disabled || mutation.isPending || !form.formState.isDirty}
       >
+        <Save className="size-4" aria-hidden="true" />
         {mutation.isPending
           ? t("Сохранение…", "Сақталуда…", "Saving…")
           : t("Сохранить проверку", "Тексеруді сақтау", "Save review")}

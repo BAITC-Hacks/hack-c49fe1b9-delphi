@@ -1,10 +1,11 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
+import { Search } from "lucide-react";
 import { useCallback, useMemo } from "react";
+import { FindingStatusBadge } from "@/components/custom-ui/finding-status-badge";
 import { DataTable } from "@/components/data-table/data-table";
 import { useDataTable } from "@/components/data-table/use-data-table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -24,12 +25,12 @@ import { useI18n } from "@/shared/i18n";
 import {
   changeLabel,
   changeTypes,
-  hasIssue,
   issueLabel,
   issueTypes,
   reviewLabel,
   reviewStatuses,
 } from "../model/labels";
+import { filterFindings, prioritizeFindings } from "../model/finding-queue";
 import { useResultsLocation } from "./use-results-location";
 
 export function FindingsTableView({
@@ -91,38 +92,8 @@ export function FindingsTableView({
 
   const filtered = useMemo(
     () =>
-      findings.filter((finding) => {
-        const linked = [
-          ...finding.before_function_ids,
-          ...finding.after_function_ids,
-        ].flatMap((id) => functionMap.get(id) ?? []);
-        const searchable = [
-          finding.title,
-          finding.explanation,
-          finding.recommendation,
-          ...linked.flatMap((item) => [
-            item.actor_original,
-            item.action,
-            item.object,
-            item.scope,
-          ]),
-          ...finding.source_ids.map((id) => sourceMap.get(id)?.clause_no ?? ""),
-        ]
-          .join(" ")
-          .toLocaleLowerCase();
-        return (
-          (!query || searchable.includes(query.toLocaleLowerCase())) &&
-          (change === "all" || finding.change_type === change) &&
-          (issue === "all" ||
-            (issue === "questions"
-              ? hasIssue(finding)
-              : finding.issue_type === issue)) &&
-          (review === "all" || finding.review.status === review) &&
-          (unit === "all" ||
-            linked.some((item) => item.owner_unit_ids.includes(unit)))
-        );
-      }),
-    [findings, functionMap, sourceMap, query, change, issue, review, unit],
+      prioritizeFindings(filterFindings(findings, functions, sources, { query, change, issue, review, unit })),
+    [findings, functions, sources, query, change, issue, review, unit],
   );
 
   const columns = useMemo<ColumnDef<FindingResponse, unknown>[]>(
@@ -131,23 +102,19 @@ export function FindingsTableView({
         accessorKey: "title",
         header: t("Изменение", "Өзгеріс", "Finding"),
         cell: ({ row }) => (
-          <div className="min-w-48 max-w-sm space-y-2 whitespace-normal">
+          <div className={`min-w-48 max-w-sm space-y-2 whitespace-normal ${row.original.review.status === "rejected" ? "opacity-65" : ""} ${selectedId === row.original.id ? "rounded-md bg-primary/5 p-2 ring-1 ring-primary/20" : ""}`}>
             <Button
               variant="link"
-              className="h-auto justify-start p-0 text-left whitespace-normal"
+              className="h-auto max-w-full justify-start p-0 text-left whitespace-normal [overflow-wrap:anywhere]"
               onClick={() => onSelect(row.original.id)}
               aria-pressed={selectedId === row.original.id}
             >
               {row.original.title}
             </Button>
             <div className="flex flex-wrap gap-1">
-              <Badge variant="outline" className="whitespace-normal">
-                {changeLabel(row.original.change_type, t)}
-              </Badge>
+              <FindingStatusBadge changeType={row.original.change_type} />
               {row.original.issue_type ? (
-                <Badge variant="secondary" className="whitespace-normal">
-                  {issueLabel(row.original.issue_type, t)}
-                </Badge>
+                <FindingStatusBadge issueType={row.original.issue_type} />
               ) : null}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -180,16 +147,7 @@ export function FindingsTableView({
         accessorKey: "review.status",
         header: t("Проверка", "Тексеру", "Review"),
         cell: ({ row }) => (
-          <Badge
-            variant={
-              row.original.review.status === "confirmed"
-                ? "secondary"
-                : "outline"
-            }
-            className="whitespace-normal"
-          >
-            {reviewLabel(row.original.review.status, t)}
-          </Badge>
+          <FindingStatusBadge reviewStatus={row.original.review.status} />
         ),
       },
     ],
@@ -198,8 +156,12 @@ export function FindingsTableView({
   const table = useDataTable({ columns, data: filtered });
 
   return (
-    <div className="min-w-0 space-y-3">
+    <div className="@container min-w-0 space-y-3">
+      <div className="space-y-3 rounded-lg border bg-card p-3">
+      <div className="relative">
+      <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
       <Input
+        className="pl-9"
         aria-label={t(
           "Поиск по функции и номеру пункта",
           "Функция және тармақ нөмірі бойынша іздеу",
@@ -213,7 +175,8 @@ export function FindingsTableView({
         value={query}
         onChange={(event) => update({ q: event.target.value })}
       />
-      <div className="grid gap-2 sm:grid-cols-2">
+      </div>
+      <div className="grid gap-2 @min-[28rem]:grid-cols-2 @min-[56rem]:grid-cols-4">
         <Filter
           label={t("Тип изменения", "Өзгеріс түрі", "Change type")}
           value={change}
@@ -222,6 +185,10 @@ export function FindingsTableView({
             {
               value: "all",
               label: t("Все изменения", "Барлық өзгерістер", "All changes"),
+            },
+            {
+              value: "reassigned",
+              label: t("Переданы, разделены, объединены", "Берілген, бөлінген, біріктірілген", "Transferred, split or merged"),
             },
             ...changeTypes.map((value) => ({
               value,
@@ -283,6 +250,7 @@ export function FindingsTableView({
           ]}
         />
       </div>
+      </div>
       <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <p>
           {t("Показано", "Көрсетілген", "Showing")}: {filtered.length} /{" "}
@@ -329,7 +297,7 @@ function Filter({
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger aria-label={label} className="w-full">
+      <SelectTrigger aria-label={label} className="h-auto min-h-9 w-full min-w-0 text-left [&>span]:whitespace-normal [&>span]:break-words">
         <SelectValue placeholder={label} />
       </SelectTrigger>
       <SelectContent>

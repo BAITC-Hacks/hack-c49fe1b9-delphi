@@ -35,6 +35,7 @@ class Run(Base):
     review_revision: Mapped[int] = mapped_column(Integer, server_default="0")
     errors: Mapped[list[Any]] = mapped_column(JSONB)
     trace: Mapped[list[Any]] = mapped_column(JSONB)
+    checkpoint: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

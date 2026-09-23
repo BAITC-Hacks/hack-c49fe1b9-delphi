@@ -2,9 +2,9 @@
 
 Updated: 2026-09-23. This document consolidates the workspace review and the agreed frontend/backend recommendations from the chat. It records current behavior, proposed improvements and relevant implementation files. Creating this document does not implement the proposed features or establish new test results.
 
-**Recommended next delivery:** an improved document reader, exact evidence highlighting and a Before/After comparison of mapped passages. Validate the real AI pipeline in parallel. Add proposed corrections and editable drafts afterward.
+**Scope update:** Phase 1 native lab-to-backend integration is complete. The separately requested Phase 2 demo-design transfer is now implemented in the connected frontend. Only the demo directory was refreshed from remote to `231811e` (design code unchanged from `45b3372`). Evidence highlighting, grouped Before/After passages, bounded word differences and queue/table views are implemented. Full-document alignment, editable proposals, revision editing and live AI acceptance remain future work.
 
-This is a feedback reference, not a replacement task tracker. [Implementation plan](implementation-plan.md) owns tasks, acceptance and delivery status; [product.md](product.md) owns product behavior; [architecture.md](architecture.md) owns data and API contracts. Promote accepted changes into those documents when implementation begins. The delivery steps below do not renumber the existing project phases.
+This is a feedback reference, not a replacement task tracker. [Implementation plan](implementation-plan.md) owns tasks, acceptance and delivery status; [product.md](product.md) owns product behavior; [architecture.md](architecture.md) owns data and API contracts. Promote accepted changes into those documents when implementation begins. The delivery steps below are feature proposals; current phase ownership is defined in the implementation plan.
 
 ## 1. Current implementation and limits
 
@@ -14,14 +14,14 @@ This is a feedback reference, not a replacement task tracker. [Implementation pl
 | Uploads | Named drafts, multiple Before/After documents, DOCX/text PDF/XLSX/Markdown, parsing notes and explicit partial-analysis consent | Scanned PDFs need separate OCR; original Office page layout is not rendered |
 | History | Saved comparisons, title search, status filters, Open/Continue and Repeat | No linked document-version timeline; revision labels are metadata |
 | Document preview | Searchable original extracted blocks, clause numbers and source locations | No faithful Word/PDF viewer or in-app paragraph editing |
-| Findings | Structure/function changes, potential risks, explanations and original evidence grouped by side | Before/After passages are stacked; no dedicated paired comparison or word-level difference highlighting |
-| Source panel | Original clause, parent context and previous/next passage navigation | No exact supporting-phrase highlight; locations currently expose raw locator JSON |
+| Findings | Summary filters, queue/table views, structure/function changes, original evidence grouped by side, responsive paired passages and bounded word differences | No exhaustive full-document alignment; many-to-many evidence is not forced into arbitrary pairs |
+| Source panel / evidence cards | Original clause, parent context, readable locations, navigation and verified Unicode-offset highlighting in evidence cards | No faithful Office layout or in-app editing; invalid offsets show the original block without highlighting |
 | Human review | Confirm, reject, request clarification and save a note | Review does not approve replacement wording or edit a document |
 | Recommendations | Saved explanation of what should be checked or clarified | No proposed replacement text, proposal decision or application workflow |
 | Languages and reports | RU/KK/EN UI, explicit translation of saved explanations, HTML/print-to-PDF and function CSV | Live AI analysis and translation quality still require acceptance |
-| Verification | Recorded migrations/seeds, basic HTTP checks, lint/typecheck/build; current plan records 10 browser tests and 10 report-generator tests passed | Result-screen browser tests use synthetic API fixtures; they do not prove live AI correctness |
+| Verification | Phase 2 lint/typecheck/build and 16/16 evidence/queue tests; real history/new-draft and synthetic summary/review visual spot checks at desktop/mobile widths | No full pipeline E2E or live AI run; the existing generated browser report is historical and was not overwritten |
 
-The [browser report](../frontend/docs/report/latest.md) is the changing source for the latest UI test result; its [README](../frontend/docs/report/README.md) explains real versus synthetic coverage. Counts above describe the snapshot reviewed for this feedback, not a new test run.
+The [frontend README](../frontend/README.md) records current commands and focused visual checks. The earlier [browser report](../frontend/docs/report/latest.md) remains unchanged and describes its own recorded version; its [README](../frontend/docs/report/README.md) explains real versus synthetic coverage.
 
 ## 2. Current user journey
 
@@ -29,57 +29,51 @@ The [browser report](../frontend/docs/report/latest.md) is the changing source f
 2. Open shared comparison history. Continue a draft, open a saved result, or choose **New comparison** and enter a title.
 3. Upload documents under **Before** and **After**. Defaults are 10 MiB per file and 10 documents per comparison; backend settings own the actual limits. Files and extracted source blocks are saved during preparation.
 4. Preview the original extracted text, check warnings and revision labels, and correct file placement. Draft files can be removed or moved between sides. Their content cannot be edited in the application.
-5. Choose the explanation language and start analysis. Both sides require readable content; parsing gaps require explicit consent. Starting locks the input set. The backend extracts units/functions, compares structure and duties, searches available After sources for suspected losses, checks overlaps/conflicts, validates evidence and saves the result. The UI polls progress.
+5. Choose the explanation language and start analysis. Both sides require readable content; parsing gaps require explicit consent. Starting locks the input set. The backend extracts units/functions, compares structure and duties, searches all available After sources for suspected losses and Before sources before calling a duty new, checks overlaps/conflicts, validates evidence and saves the result. The UI polls progress.
 6. Inspect structure, findings and their original sources. Save human-review decisions and notes, then view/export the conclusion. UI language changes do not rerun analysis; translation is an explicit action on saved explanations.
 7. To compare revised content, choose **Repeat**, remove the copied file being replaced, upload its replacement and start a new run. The previous analysis keeps its original input and result. Today the new comparison is not linked into a document-version timeline.
 
-## 3. Next delivery: reader and comparison
+## 3. Implemented reader and comparison; remaining validation
 
-Build inside the connected `frontend/` application and its FastAPI backend. Use the existing results workspace, especially **Functions and risks**, rather than adding another main page.
+The connected `frontend/` now uses the demo navy/white tokens, locally bundled
+Inter/JetBrains Mono, top navigation, compact history and real two-column
+Before/After upload zones. Draft creation, server uploads, revision labels,
+moving/removing files and explicit partial-analysis consent remain intact.
+Results offer summary filters and queue/table views over the same saved data;
+URL filters and finding/source links remain available. Review decisions still
+save through the product API and advance the queue to another unreviewed finding.
 
-```text
-Finding list → Original / Before–After reader → Explanation and human review
-```
+### A. Evidence reader and exact highlighting — implemented
 
-### A. Document reader and exact evidence highlighting
+Evidence cards show original text, file/revision/clause context and expandable
+parent text. They validate integer Python Unicode code-point offsets, convert
+them to JavaScript UTF-16 and require an exact excerpt match. Null offsets mean
+the whole block only when excerpt matches it. Invalid bounds or a mismatched
+excerpt show the full original block with a warning and no fabricated highlight.
+Long clauses can expand; original whitespace and quotations remain unchanged.
+This is an extracted-text reader, not a faithful Office/PDF layout viewer.
 
-**Frontend work**
+### B. Grouped Before/After passages and word differences — implemented
 
-- Make all uploaded extracted documents accessible from the result screen.
-- Show filename, side, revision label, clause number, parent/surrounding context and parsing limitations.
-- Highlight the exact phrase supporting the selected finding while preserving the original text and whitespace.
-- Show page, sheet, cell or paragraph information when available instead of raw location JSON. Do not invent page numbers for formats where the parser does not provide them.
-- Support keyboard navigation, small screens and the existing finding/source links.
+All direct Before/After sources and additional context are retained, shown beside
+one another when space permits and stacked on narrow views. Missing or
+inapplicable sides do not receive invented quotations. Overlap/conflict findings
+retain their After evidence. Many-to-many mappings remain groups.
 
-**Backend/contract work**
+Word differences are available only when one Before function and one After
+function each have exactly one direct source with valid evidence offsets.
+Split/merge, overlap/conflict and ambiguous groups are excluded. The local LCS
+preserves whitespace and is bounded to 600 word/whitespace tokens and 60,000
+UTF-16 units on each side; oversized input keeps the original passages and shows
+a limit message. Removed wording is not proof of a lost duty. Opening evidence,
+changing queue/table mode or showing word differences makes no model request.
 
-- Reuse `original_text`, `excerpt`, `start_offset` and `end_offset` from the evidence API. Basic highlighting needs no new persistence model.
-- Document offsets as Unicode code-point positions with an exclusive end, matching Python slicing. Convert correctly in JavaScript; ordinary UTF-16 string slicing is not equivalent for every character.
-- Check bounds and that the selected exact text matches the excerpt. Do not trim or normalize the stored source before applying offsets.
-- Null, invalid or ambiguous offsets must fall back to the cited block without a fabricated phrase highlight.
+Full-document alignment, a separate complete-document comparison mode and the
+proposal/editor/version workflows below remain future work. Current technical
+checks and visual spot checks are recorded in the frontend README; they do not
+establish live model correctness.
 
-**Acceptance:** selecting a finding opens the right source and highlights only verified evidence. Test repeated phrases, newlines, RU/KK/EN text, combining marks and non-BMP characters. Original source content remains unchanged.
-
-### B. Before/After comparison of mapped passages
-
-**Frontend work**
-
-- Show Before and After passages in paired columns on desktop and stacked sections on mobile.
-- Provide Original and Before/After modes, with optional deterministic added/removed-word highlighting.
-- Preserve the selected finding, source context, filters and deep links while changing modes.
-- Support multiple documents and many-to-many mappings, including split and merged duties.
-- For overlap/conflict findings, show the relevant After passages together. A missing counterpart should remain explicitly absent; do not fabricate an After quotation.
-
-**Backend/contract work**
-
-- Reuse saved function/source relationships. Do not pair clauses solely by equal numbering or evidence-list position.
-- Keep ambiguous or multiple relationships visible as groups; a many-to-many mapping does not establish a unique paragraph pair.
-- A deterministic text-difference helper can initially work on already available passages. A full-document diff endpoint is not required for this delivery.
-- Label the scope accurately: mapped-passage comparison does not enumerate every textual change in the entire document set. Comprehensive document comparison would need a separate alignment and coverage contract.
-
-**Acceptance:** the `5.4.4 → 5.3.3` transfer opens both actual sources; split/merge and two-After-source cases work; renumbering alone is not presented as a lost duty. Reading or changing comparison modes makes no new model request.
-
-### C. Live AI validation in parallel
+### C. Future live AI validation — outside this design transfer
 
 Follow the existing [acceptance plan](implementation-plan.md) and [source ground truth](source-analysis.md):
 
@@ -88,7 +82,7 @@ Follow the existing [acceptance plan](implementation-plan.md) and [source ground
 - Actual saved review, translation and export behavior, beyond the synthetic result-screen tests.
 - Runtime, coverage, partial/error states and actual model-call costs under explicit limits. Record misses and false positives rather than inventing a general accuracy percentage.
 
-The backend currently persists progress during execution but saves extracted results after the agent returns. Checkpoint/resume and cost accounting are useful follow-ups if observed failures require them; they are not prerequisites for the reader. The separate lab's partial run does not establish product AI readiness.
+The backend now saves accepted checkpoints and supports continuation before human review, using the frozen PostgreSQL source registry. Partial outputs remain explicit; this does not establish model quality. Existing lab cost accounting is unchanged, and a separate backend cost-accounting expansion was not part of the current integration or design transfer.
 
 ## 4. Subsequent delivery: AI wording proposals
 
@@ -164,7 +158,7 @@ UI translations must preserve original quotations. Reviewing a finding must not 
 | Login, registration and protection | [Sign-in](../frontend/src/features/auth/client/sign-in-form.tsx), [sign-up](../frontend/src/features/auth/client/sign-up-form.tsx), [auth configuration](../frontend/src/server/auth.ts), [workspace gate](<../frontend/src/app/(workspace)/layout.tsx>), [proxy route](../frontend/src/app/backend/[...path]/route.ts), [proxy forwarding](../frontend/src/server/backend-proxy.ts) |
 | History and repeat | [History table](../frontend/src/features/analyses/client/history-table-view.tsx), [analysis API](../frontend/src/features/analyses/api/analyses.ts) |
 | Upload and document preparation | [Comparison editor](../frontend/src/features/analyses/client/comparison-editor.tsx), [document card](../frontend/src/features/analyses/client/document-card.tsx), [source preview](../frontend/src/features/analyses/client/source-preview.tsx) |
-| Reader and comparison integration | [Results workspace](../frontend/src/features/results/client/results-workspace.tsx), [findings table](../frontend/src/features/results/client/findings-table-view.tsx), [finding detail](../frontend/src/features/results/client/finding-detail.tsx), [source panel](../frontend/src/features/results/client/source-panel.tsx) |
+| Reader and comparison integration | [Evidence validation/diff](../frontend/src/features/results/model/evidence.ts), [evidence cards](../frontend/src/features/results/client/evidence-card.tsx), [word differences](../frontend/src/features/results/client/word-diff.tsx), [review queue](../frontend/src/features/results/client/review-queue.tsx), [Results workspace](../frontend/src/features/results/client/results-workspace.tsx), [findings table](../frontend/src/features/results/client/findings-table-view.tsx), [finding detail](../frontend/src/features/results/client/finding-detail.tsx), [source panel](../frontend/src/features/results/client/source-panel.tsx) |
 | Structure, coverage and shareable state | [Structure view](../frontend/src/features/results/client/structure-view.tsx), [coverage summary](../frontend/src/features/results/client/coverage-summary.tsx), [URL state](../frontend/src/features/results/client/use-results-location.ts) |
 | Review, translation and exports | [Review form](../frontend/src/features/results/client/review-form.tsx), [conclusion view](../frontend/src/features/results/client/conclusion-view.tsx), [results API](../frontend/src/features/results/api/results-api.ts), [UI localization](../frontend/src/shared/i18n/index.tsx) |
 | Generated contract | [HeyAPI configuration](../frontend/openapi-ts.config.ts), [generated client/types](../frontend/src/shared/api/generated/) — regenerate from OpenAPI; do not hand-edit |
@@ -189,13 +183,13 @@ UI translations must preserve original quotations. Reviewing a finding must not 
 | Browser acceptance | [Results tests](../frontend/tests/e2e/results.spec.ts), [workspace tests](../frontend/tests/e2e/workspace.spec.ts), [auth tests](../frontend/tests/e2e/auth.spec.ts), [mobile tests](../frontend/tests/e2e/mobile.spec.ts), [synthetic result fixtures](../frontend/tests/fixtures/results.ts) |
 | Browser report | [Latest report](../frontend/docs/report/latest.md), [report instructions](../frontend/docs/report/README.md), [reporter tests](../frontend/tests/reporters/ui-report.test.mjs) |
 | Backend regression checks | [Parser tests](../backend/tests/test_parsers.py), [mocked-agent tests](../backend/tests/test_agent.py), [report integrity](../backend/tests/test_report_integrity.py), [synthetic corpus checks](../backend/tests/test_synthetic_fixtures.py) |
-| Separate demo/design work | [Demo README](../demo-frontend/README.md), [design](design/DESIGN.md), [scenarios](design/SCENARIOS.md), [UI prompts](design/ASTRA-UI-PROMPTS.md). These do not prove a feature exists in the connected Next.js frontend; demo design remains a separate project phase. |
+| Demo design reference | [Demo README](../demo-frontend/README.md), [design](../demo-frontend/docs/design/DESIGN.md), [scenarios](../demo-frontend/docs/design/SCENARIOS.md), [UI prompts](../demo-frontend/docs/design/ASTRA-UI-PROMPTS.md). The design is adapted to the connected Next.js frontend; demo fixtures and transport remain separate. |
 | Earlier project snapshots | [Earlier feedback](research/delphi-current-feedback.md), [handoff](handoff.md), [history](history.md). Frontend/readiness claims describe earlier states; prefer current owning docs, code and reports. |
 | Lab and reliability proposals | [Lab README](../lab/README.md), [lab documentation](../lab/docs/README.md), [partial live-run handoff](../lab/docs/handoff.md), [backend/lab alignment](../lab/docs/backend-lab-alignment.md), [cost tooling](../agent_costs/README.md). Experimental results and proposed transfers are not implemented product guarantees; do not introduce a SQLite fallback. |
 
 ## 8. Implementation handoff
 
-- Immediate scope is **A + B**, with **C** as parallel validation. Proposals and editable drafts are subsequent work, not implied additions to the current hackathon MVP.
+- **A/B are implemented within the limits above.** Phase 2 retained product API/auth/RU-KK-EN/review semantics and passed current static/unit checks plus focused real/synthetic visual checks. C, complete-document alignment, proposals and editable drafts remain future work; no full pipeline E2E or live AI run was added.
 - Move selected tasks and acceptance status into [implementation-plan.md](implementation-plan.md); update [product.md](product.md) for UI behavior and [architecture.md](architecture.md) for changed contracts. Keep this document as the rationale and file map.
 - Preserve original files under `docs/sources` and `docs/hackaton`. Put new synthetic fixtures in their dedicated locations and label screenshots/results accurately.
 - Keep the current stack, thin routers, service-owned transactions, PostgreSQL/Alembic, one bounded agent and stable OpenAPI operation IDs. Generate shadcn primitives through the CLI and keep product components outside `components/ui`.

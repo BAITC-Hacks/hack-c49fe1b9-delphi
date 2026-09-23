@@ -4,6 +4,7 @@ from uuid import UUID
 
 from app.agent.models import AgentError, AnalysisOutput, FindingDraft, SourceInput
 from app.agent.validation import validate_finding
+from app.schemas.findings import SearchCoverage
 
 
 def uuid_value(value: str) -> UUID:
@@ -63,9 +64,10 @@ def validate_output(output: AnalysisOutput, sources: list[SourceInput]) -> None:
                 raise ValueError("Unit parent is absent from this result")
             current = units[current.parent_unit_id]
     for function in functions.values():
-        references(function.owner_unit_ids, units, function.side, required=True)
+        references(function.owner_unit_ids, units, function.side)
+        if not function.owner_unit_ids and not output.partial:
+            raise ValueError("A function with an unresolved owner requires a partial result")
         references(function.source_ids, registry, function.side, required=True)
-    after_ids = {source.id for source in sources if source.side == "after"}
     for finding in output.findings:
         draft = FindingDraft.model_validate(finding.model_dump(exclude={"id", "search"}))
         try:
@@ -73,25 +75,41 @@ def validate_output(output: AnalysisOutput, sources: list[SourceInput]) -> None:
         except AgentError as exc:
             raise ValueError(str(exc)) from exc
         if finding.search is not None:
+            SearchCoverage.model_validate(finding.search)
+            side = "before" if finding.search.get("method") == "semantic_all_before_batches" else "after"
+            expected_sources = {source.id for source in sources if source.side == side}
             reviewed = finding.search.get("reviewed_source_ids")
             candidates = finding.search.get("candidate_source_ids")
             for ids in (reviewed, candidates):
                 if not isinstance(ids, list) or any(not isinstance(value, str) for value in ids):
                     raise ValueError("Missing-function search has invalid source references")
-                references(ids, registry, "after")
+                references(ids, registry, side)
             if not set(candidates) <= set(reviewed):
                 raise ValueError("Search candidates were not reviewed")
-            if finding.search.get("complete") is True and set(reviewed) != after_ids:
-                raise ValueError("Complete search did not cover the entire After set")
-        if finding.change_type == "potentially_missing":
+            if finding.search.get("complete") is True and (
+                set(reviewed) != expected_sources
+                or finding.search.get("errors")
+                or finding.search.get("input_partial")
+            ):
+                raise ValueError("Complete search did not cover its entire source set")
+        if finding.change_type in {"potentially_missing", "new"}:
+            method = (
+                "semantic_all_before_batches" if finding.change_type == "new"
+                else "semantic_all_after_batches"
+            )
             if (
                 finding.search is None
                 or finding.search.get("complete") is not True
-                or finding.search.get("method") != "semantic_all_after_batches"
+                or finding.search.get("method") != method
                 or finding.search.get("candidate_source_ids")
                 or finding.search.get("errors")
             ):
-                raise ValueError("Missing-function finding lacks a complete semantic search")
+                raise ValueError("Absent/new function finding lacks a complete semantic search")
+            if any(
+                not functions[identifier].owner_unit_ids
+                for identifier in finding.before_function_ids + finding.after_function_ids
+            ):
+                raise ValueError("Absent/new function finding has an unresolved owner")
     seen_units = set()
     for match in output.structure:
         references(match.before_unit_ids, units, "before")
