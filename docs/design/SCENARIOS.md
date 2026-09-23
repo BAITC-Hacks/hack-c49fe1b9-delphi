@@ -4,7 +4,7 @@
 
 Статусы: ✅ работает во фронте · 🔶 фронт готов, ждёт бэкенд · ❌ не реализовано · 💡 доработка, оценка в минутах.
 
-Связанные документы: [product.md](../product.md) (что строим), [architecture.md](../architecture.md) (как устроен бэкенд), [DESIGN.md](DESIGN.md) (интерфейс), [frontend/README.md](../../frontend/README.md) (контракт API).
+Связанные документы: [product.md](../product.md) (что строим), [architecture.md](../architecture.md) (как устроен бэкенд), [DESIGN.md](DESIGN.md) (интерфейс), [demo-frontend/README.md](../../frontend/README.md) (контракт API).
 
 ---
 

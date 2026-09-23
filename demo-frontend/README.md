@@ -1,11 +1,11 @@
-# Delphi — frontend
+# Delphi — demo-frontend
 
 React 18 + TypeScript + Vite + Tailwind CSS 4 + shadcn/ui. UI на русском. Дизайн-система и UX-правила: [`docs/design/DESIGN.md`](../docs/design/DESIGN.md). Продуктовые требования: [`docs/product.md`](../docs/product.md).
 
 ## Запуск
 
 ```bash
-cd frontend
+cd demo-frontend
 npm install
 npm run dev        # http://localhost:5173, /api/* проксируется на http://localhost:8000
 npm run build      # tsc --noEmit && vite build → dist/
@@ -18,7 +18,7 @@ npm run build      # tsc --noEmit && vite build → dist/
 | `VITE_API_URL` | пусто | База API. Пусто = тот же origin (dev-прокси или FastAPI static в проде) |
 | `API_PROXY_TARGET` | `http://localhost:8000` | Куда `vite dev` проксирует `/api` |
 
-В проде бэкенд отдаёт `frontend/dist` как статику с того же origin; SPA-маршруты должны падать на `index.html`.
+В проде бэкенд отдаёт `demo-frontend/dist` как статику с того же origin; SPA-маршруты должны падать на `index.html`.
 
 ## Маршруты (по `docs/product.md` §3)
 
@@ -34,9 +34,11 @@ npm run build      # tsc --noEmit && vite build → dist/
 
 Кнопка «Загрузить пример: редакции 8 и 9» открывает `/analyses/demo` и читает `public/demo/result.json` + `public/demo/clauses.json` без бэкенда. В шапке — бейдж «Пример: показан сохранённый результат». Тексты пунктов взяты дословно из `docs/hackaton/tracks/Положение_о_внутреннем_аудите_редакция_{8,9}_обезличено.docx.md`.
 
-## Контракт API, который ждёт фронт (композитный)
+## Контракт API
 
-`docs/architecture.md` §4 описывает гранулярный API (documents → runs → findings → evidence → sources). Фронт использует **композитную обёртку** над ним — так бэкенду достаточно собрать один агрегат, а UI работает сразу. Типы — `src/types.ts`, вызовы — `src/lib/api.ts`. При расхождении правится фронт.
+> **Статус на 15:50:** бэкенд в `backend/` реализовал гранулярный API (`backend/openapi.json`), а не композитный ниже. Адаптация фронта — задача №1, пошаговый план и маппинг enum-ов: `docs/handoff.md` §3. Таблица ниже описывает то, что фронт ждёт **сейчас**; после адаптации её заменить на реальные вызовы.
+
+`docs/architecture.md` §4 описывает гранулярный API (documents → runs → findings → evidence → sources). Фронт пока использует **композитную обёртку**. Типы — `src/types.ts`, вызовы — `src/lib/api.ts`. При расхождении правится фронт.
 
 | Метод | Путь | Тело / ответ |
 |---|---|---|
