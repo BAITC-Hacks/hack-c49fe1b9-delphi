@@ -1,0 +1,7 @@
+{
+  "synthetic": true,
+  "defaults": {"provider": "openrouter", "model": "openai/gpt-4.1-mini", "encoding": "o200k_base"},
+  "actions": [
+    {"action": "extract_functions", "request_file": "request.synthetic.json", "output_tokens": 600, "calls": 1}
+  ]
+}

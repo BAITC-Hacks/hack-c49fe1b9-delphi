@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "currency": "USD",
+  "rates": {
+    "openrouter:openai/gpt-4.1-mini": {
+      "input": "4E-7",
+      "output": "0.0000016",
+      "cache_read": "1E-7",
+      "cache_write": null,
+      "request": "0",
+      "source": "https://openrouter.ai/api/v1/models",
+      "fetched_at": "2026-09-23T10:18:12.796567+00:00",
+      "context_length": 1047576,
+      "raw_pricing": {
+        "prompt": "0.0000004",
+        "completion": "0.0000016",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000001"
+      },
+      "scope": "text tokens and per-request fee; catalog estimate, routing/tier may differ"
+    }
+  }
+}

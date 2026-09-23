@@ -26,6 +26,8 @@ downloads/
 eggs/
 .eggs/
 lib/
+!frontend/src/lib/
+!frontend/src/lib/**
 lib64/
 # Python-only rule above must not hide the frontend's src/lib
 !demo-frontend/src/lib/

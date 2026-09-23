@@ -70,7 +70,7 @@ uv run --no-sync python scripts/export_openapi.py
 
 This imports the application without starting its lifecycle: no database, Docker, API key or AI request is required. Give the resulting `backend/openapi.json` to your HeyAPI generator. Keep generated clients in the frontend's shared API directory and consume them from feature modules.
 
-## Configuration and later startup
+## Configuration and startup
 
 Use Python 3.12 and uv. Create `backend/.env` from [.env.example](.env.example) only if it does not already exist. Set a local PostgreSQL password and the matching `DATABASE_URL`; use a URL-safe password or URL-encode it in the DSN. Runtime limits are explicit settings. Set `OPENAI_API_KEY` and `OPENAI_MODEL` for analysis and translation. Without them, document preparation remains available and AI operations return an explicit 503.
 
@@ -90,7 +90,7 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
 
 The API schema is also served at `/openapi.json`, Swagger at `/docs`, and status at `/api/health`. The configured local PostgreSQL port is `54329`. Keep one API worker. The provided Dockerfile/Compose API service is an alternative deployment configuration; it has not been built during this code-preparation step.
 
-Optional demo fixture instructions are in [fixtures/README.md](fixtures/README.md). Development user records are preparation for a later authentication phase: login, JWT and access control are not implemented. The current MVP uses one shared demo workspace.
+Optional demo fixture instructions are in [fixtures/README.md](fixtures/README.md). Backend development user records remain scaffolding: FastAPI has no login or resource-ownership enforcement. The frontend now provides Better Auth sessions in a separate database and a protected proxy; the backend workspace is shared.
 
 ## Verification status
 
@@ -101,7 +101,9 @@ uv run ruff check app scripts migrations tests
 uv run pytest -q
 ```
 
-The initial migration was checked against PostgreSQL earlier in the session. The later development-user migration is prepared in code. Full API/database behavior and real AI quality still need integration verification. The supplied revision 9 DOCX is now included in the parser regression checks: all 318 numbered clauses match its Markdown export after normalization, and every extracted block retains exact paragraph offsets. The official demo seed uses both DOCX files.
+Phase 0/1 integration additionally applied both migrations against local PostgreSQL and reran the seed successfully. HTTP checks covered health, reading the official draft and sources, and multipart Markdown upload/deletion through the authenticated frontend proxy. The retained database has one official draft, two DOCX documents and 966 source blocks. Better Auth migration/seeding and HTTP sign-in/session/sign-out were checked separately. Phase 2 then verified real authentication and document preparation in Playwright; result screens use labelled synthetic fixtures. See the [browser report](../frontend/docs/report/latest.md). Live AI quality remains unverified.
+
+The supplied revision 9 DOCX is included in the parser regression checks: all 318 numbered clauses match its Markdown export after normalization, and every extracted block retains exact paragraph offsets. The official demo seed uses both DOCX files.
 
 The [synthetic acceptance corpus](fixtures/synthetic/README.md) adds labelled missing-duty, overlap, potential-conflict and false-positive examples. Its checks establish readable inputs and valid expected source references; they do not establish that a real model produces the expected semantic findings. Keep synthetic and official results separate when measuring actual runs. Real supplied documents are Russian; Kazakh/English semantic quality needs separate examples. Scanned PDFs need OCR outside the current parser, tracked changes and absent annexes remain explicit coverage limitations.
 

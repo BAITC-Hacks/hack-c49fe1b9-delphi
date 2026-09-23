@@ -1,0 +1,344 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+import { useCallback, useMemo } from "react";
+import { DataTable } from "@/components/data-table/data-table";
+import { useDataTable } from "@/components/data-table/use-data-table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type {
+  FindingResponse,
+  FunctionResponse,
+  SourceResponse,
+  UnitResponse,
+} from "@/shared/api/generated";
+import { useI18n } from "@/shared/i18n";
+import {
+  changeLabel,
+  changeTypes,
+  hasIssue,
+  issueLabel,
+  issueTypes,
+  reviewLabel,
+  reviewStatuses,
+} from "../model/labels";
+import { useResultsLocation } from "./use-results-location";
+
+export function FindingsTableView({
+  findings,
+  functions,
+  units,
+  sources,
+  selectedId,
+  onSelect,
+}: {
+  findings: FindingResponse[];
+  functions: FunctionResponse[];
+  units: UnitResponse[];
+  sources: SourceResponse[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  const { params, update } = useResultsLocation();
+  const query = params.get("q") ?? "";
+  const change = params.get("change") ?? "all";
+  const issue = params.get("issue") ?? "all";
+  const review = params.get("review") ?? "all";
+  const unit = params.get("unit") ?? "all";
+  const functionMap = useMemo(
+    () => new Map(functions.map((item) => [item.id, item])),
+    [functions],
+  );
+  const unitMap = useMemo(
+    () => new Map(units.map((item) => [item.id, item])),
+    [units],
+  );
+  const sourceMap = useMemo(
+    () => new Map(sources.map((item) => [item.id, item])),
+    [sources],
+  );
+
+  const owners = useCallback(
+    (ids: string[]) => {
+      return (
+        [
+          ...new Set(
+            ids.flatMap((id) => {
+              const item = functionMap.get(id);
+              if (!item) return [];
+              return item.owner_unit_ids.length
+                ? item.owner_unit_ids.map(
+                    (owner) =>
+                      unitMap.get(owner)?.name_original ?? item.actor_original,
+                  )
+                : [item.actor_original];
+            }),
+          ),
+        ].join(" / ") || "—"
+      );
+    },
+    [functionMap, unitMap],
+  );
+
+  const filtered = useMemo(
+    () =>
+      findings.filter((finding) => {
+        const linked = [
+          ...finding.before_function_ids,
+          ...finding.after_function_ids,
+        ].flatMap((id) => functionMap.get(id) ?? []);
+        const searchable = [
+          finding.title,
+          finding.explanation,
+          finding.recommendation,
+          ...linked.flatMap((item) => [
+            item.actor_original,
+            item.action,
+            item.object,
+            item.scope,
+          ]),
+          ...finding.source_ids.map((id) => sourceMap.get(id)?.clause_no ?? ""),
+        ]
+          .join(" ")
+          .toLocaleLowerCase();
+        return (
+          (!query || searchable.includes(query.toLocaleLowerCase())) &&
+          (change === "all" || finding.change_type === change) &&
+          (issue === "all" ||
+            (issue === "questions"
+              ? hasIssue(finding)
+              : finding.issue_type === issue)) &&
+          (review === "all" || finding.review.status === review) &&
+          (unit === "all" ||
+            linked.some((item) => item.owner_unit_ids.includes(unit)))
+        );
+      }),
+    [findings, functionMap, sourceMap, query, change, issue, review, unit],
+  );
+
+  const columns = useMemo<ColumnDef<FindingResponse, unknown>[]>(
+    () => [
+      {
+        accessorKey: "title",
+        header: t("Изменение", "Өзгеріс", "Finding"),
+        cell: ({ row }) => (
+          <div className="min-w-48 max-w-sm space-y-2 whitespace-normal">
+            <Button
+              variant="link"
+              className="h-auto justify-start p-0 text-left whitespace-normal"
+              onClick={() => onSelect(row.original.id)}
+              aria-pressed={selectedId === row.original.id}
+            >
+              {row.original.title}
+            </Button>
+            <div className="flex flex-wrap gap-1">
+              <Badge variant="outline" className="whitespace-normal">
+                {changeLabel(row.original.change_type, t)}
+              </Badge>
+              {row.original.issue_type ? (
+                <Badge variant="secondary" className="whitespace-normal">
+                  {issueLabel(row.original.issue_type, t)}
+                </Badge>
+              ) : null}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {row.original.source_ids
+                .map((id) => sourceMap.get(id)?.clause_no)
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          </div>
+        ),
+      },
+      {
+        id: "owners",
+        header: t(
+          "Исполнители: до → после",
+          "Орындаушылар: дейін → кейін",
+          "Owners: before → after",
+        ),
+        cell: ({ row }) => (
+          <div className="max-w-56 whitespace-normal text-xs">
+            <p>{owners(row.original.before_function_ids)}</p>
+            <p className="my-1 text-muted-foreground" aria-hidden="true">
+              ↓
+            </p>
+            <p>{owners(row.original.after_function_ids)}</p>
+          </div>
+        ),
+      },
+      {
+        accessorKey: "review.status",
+        header: t("Проверка", "Тексеру", "Review"),
+        cell: ({ row }) => (
+          <Badge
+            variant={
+              row.original.review.status === "confirmed"
+                ? "secondary"
+                : "outline"
+            }
+            className="whitespace-normal"
+          >
+            {reviewLabel(row.original.review.status, t)}
+          </Badge>
+        ),
+      },
+    ],
+    [onSelect, owners, selectedId, sourceMap, t],
+  );
+  const table = useDataTable({ columns, data: filtered });
+
+  return (
+    <div className="min-w-0 space-y-3">
+      <Input
+        aria-label={t(
+          "Поиск по функции и номеру пункта",
+          "Функция және тармақ нөмірі бойынша іздеу",
+          "Search function or clause number",
+        )}
+        placeholder={t(
+          "Функция, исполнитель, пункт…",
+          "Функция, орындаушы, тармақ…",
+          "Function, owner, clause…",
+        )}
+        value={query}
+        onChange={(event) => update({ q: event.target.value })}
+      />
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Filter
+          label={t("Тип изменения", "Өзгеріс түрі", "Change type")}
+          value={change}
+          onChange={(value) => update({ change: value })}
+          options={[
+            {
+              value: "all",
+              label: t("Все изменения", "Барлық өзгерістер", "All changes"),
+            },
+            ...changeTypes.map((value) => ({
+              value,
+              label: changeLabel(value, t),
+            })),
+          ]}
+        />
+        <Filter
+          label={t("Вопросы", "Сұрақтар", "Issues")}
+          value={issue}
+          onChange={(value) => update({ issue: value })}
+          options={[
+            {
+              value: "all",
+              label: t("Все выводы", "Барлық қорытындылар", "All findings"),
+            },
+            {
+              value: "questions",
+              label: t("Только вопросы", "Тек сұрақтар", "Only issues"),
+            },
+            ...issueTypes.map((value) => ({
+              value,
+              label: issueLabel(value, t),
+            })),
+          ]}
+        />
+        <Filter
+          label={t("Проверка", "Тексеру", "Review")}
+          value={review}
+          onChange={(value) => update({ review: value })}
+          options={[
+            {
+              value: "all",
+              label: t(
+                "Все статусы проверки",
+                "Барлық тексеру күйлері",
+                "All review states",
+              ),
+            },
+            ...reviewStatuses.map((value) => ({
+              value,
+              label: reviewLabel(value, t),
+            })),
+          ]}
+        />
+        <Filter
+          label={t("Подразделение", "Бөлімше", "Unit")}
+          value={unit}
+          onChange={(value) => update({ unit: value })}
+          options={[
+            {
+              value: "all",
+              label: t("Все подразделения", "Барлық бөлімшелер", "All units"),
+            },
+            ...units.map((item) => ({
+              value: item.id,
+              label: `${item.side === "before" ? t("До", "Дейін", "Before") : t("После", "Кейін", "After")} · ${item.name_original}`,
+            })),
+          ]}
+        />
+      </div>
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <p>
+          {t("Показано", "Көрсетілген", "Showing")}: {filtered.length} /{" "}
+          {findings.length}
+        </p>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() =>
+            update({
+              q: null,
+              change: null,
+              issue: null,
+              review: null,
+              unit: null,
+            })
+          }
+        >
+          {t("Сбросить фильтры", "Сүзгілерді тазалау", "Reset filters")}
+        </Button>
+      </div>
+      <DataTable
+        table={table}
+        emptyMessage={t(
+          "Нет выводов для выбранных фильтров.",
+          "Таңдалған сүзгілер бойынша қорытынды жоқ.",
+          "No findings match these filters.",
+        )}
+      />
+    </div>
+  );
+}
+
+function Filter({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger aria-label={label} className="w-full">
+        <SelectValue placeholder={label} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}

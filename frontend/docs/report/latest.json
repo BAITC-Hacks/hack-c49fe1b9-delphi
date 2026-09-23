@@ -1,0 +1,269 @@
+{
+  "generatedAt": "2026-09-23T11:33:11.187Z",
+  "runId": "2026-09-23T11-32-49-881Z-59eaa4f8",
+  "status": "passed",
+  "durationMs": 21288.897,
+  "tests": [
+    {
+      "title": "desktop-chromium › auth.spec.ts › sign-in validation, real session and sign-out protection",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "errors": []
+    },
+    {
+      "title": "desktop-chromium › auth.spec.ts › registration page validates fields and preserves entered values",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "errors": []
+    },
+    {
+      "title": "desktop-chromium › results.spec.ts › structure mappings preserve source context and source navigation",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "errors": []
+    },
+    {
+      "title": "desktop-chromium › results.spec.ts › findings support URL filters, evidence, review persistence and report exports",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "errors": []
+    },
+    {
+      "title": "desktop-chromium › results.spec.ts › language changes do not run AI and explicit translations expire after review changes",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "errors": []
+    },
+    {
+      "title": "desktop-chromium › results.spec.ts › active runs poll and failed runs explain why results are unavailable",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "errors": []
+    },
+    {
+      "title": "desktop-chromium › results.spec.ts › invalid finding links and empty filters have explicit recoverable states",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "errors": []
+    },
+    {
+      "title": "desktop-chromium › workspace.spec.ts › official history, parsing consent and exact source preview",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "errors": []
+    },
+    {
+      "title": "desktop-chromium › workspace.spec.ts › create a draft, upload both sides, revise, move and remove documents",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "errors": []
+    },
+    {
+      "title": "mobile-chromium › mobile.spec.ts › mobile navigation, notifications and persistent RU/KK/EN selection",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "errors": []
+    }
+  ],
+  "captures": [
+    {
+      "name": "Sign in",
+      "description": "Protected pages redirect to the email/password sign-in screen.",
+      "route": "/sign-in",
+      "viewport": "1440 × 1000",
+      "dataSource": "Live local Better Auth and PostgreSQL",
+      "status": "passed",
+      "test": "desktop-chromium › auth.spec.ts › sign-in validation, real session and sign-out protection",
+      "project": "desktop-chromium",
+      "screenshot": "screenshots/2026-09-23T11-32-49-881Z-59eaa4f8/001-sign-in-desktop-chromium.png"
+    },
+    {
+      "name": "Create account",
+      "description": "Registration shows field errors without losing entered values. Passwords are masked in screenshots.",
+      "route": "/sign-up",
+      "viewport": "1440 × 1000",
+      "dataSource": "Real frontend form validation; no account created",
+      "status": "passed",
+      "test": "desktop-chromium › auth.spec.ts › registration page validates fields and preserves entered values",
+      "project": "desktop-chromium",
+      "screenshot": "screenshots/2026-09-23T11-32-49-881Z-59eaa4f8/002-sign-up-desktop-chromium.png"
+    },
+    {
+      "name": "Analysis · Structure",
+      "description": "Before/after unit mappings link each structural change to its original source clauses.",
+      "route": "/analyses/10000000-0000-4000-8000-000000000001?tab=structure",
+      "viewport": "1440 × 1000",
+      "dataSource": "Synthetic API fixture; real frontend and authentication; no live AI",
+      "status": "passed",
+      "test": "desktop-chromium › results.spec.ts › structure mappings preserve source context and source navigation",
+      "project": "desktop-chromium",
+      "screenshot": "screenshots/2026-09-23T11-32-49-881Z-59eaa4f8/003-results-structure-desktop-chromium.png"
+    },
+    {
+      "name": "Analysis · Original source and parent context",
+      "description": "The source panel keeps original Russian quotations, parent clauses and neighbouring-block navigation.",
+      "route": "/analyses/10000000-0000-4000-8000-000000000001?tab=structure",
+      "viewport": "1440 × 1000",
+      "dataSource": "Synthetic API fixture; real frontend and authentication; no live AI",
+      "status": "passed",
+      "test": "desktop-chromium › results.spec.ts › structure mappings preserve source context and source navigation",
+      "project": "desktop-chromium",
+      "screenshot": "screenshots/2026-09-23T11-32-49-881Z-59eaa4f8/004-results-source-context-desktop-chromium.png"
+    },
+    {
+      "name": "Analysis · Functions and risks",
+      "description": "Searchable findings use shareable URL filters for change type, issues, review status and units.",
+      "route": "/analyses/10000000-0000-4000-8000-000000000001?change=transferred",
+      "viewport": "1440 × 1000",
+      "dataSource": "Synthetic API fixture; real frontend and authentication; no live AI",
+      "status": "passed",
+      "test": "desktop-chromium › results.spec.ts › findings support URL filters, evidence, review persistence and report exports",
+      "project": "desktop-chromium",
+      "screenshot": "screenshots/2026-09-23T11-32-49-881Z-59eaa4f8/005-results-findings-filter-desktop-chromium.png"
+    },
+    {
+      "name": "Analysis · Finding evidence and human review",
+      "description": "A deep-linked finding shows original before/after quotations and a separate human-review form.",
+      "route": "/analyses/10000000-0000-4000-8000-000000000001?finding=70000000-0000-4000-8000-000000000001",
+      "viewport": "1440 × 1000",
+      "dataSource": "Synthetic API fixture; real frontend and authentication; no live AI",
+      "status": "passed",
+      "test": "desktop-chromium › results.spec.ts › findings support URL filters, evidence, review persistence and report exports",
+      "project": "desktop-chromium",
+      "screenshot": "screenshots/2026-09-23T11-32-49-881Z-59eaa4f8/006-results-finding-evidence-desktop-chromium.png"
+    },
+    {
+      "name": "Analysis · Reviewed conclusion and exports",
+      "description": "The report reflects the saved human review and stays available in its original language before translation.",
+      "route": "/analyses/10000000-0000-4000-8000-000000000001?finding=70000000-0000-4000-8000-000000000001&tab=conclusion",
+      "viewport": "1440 × 1000",
+      "dataSource": "Synthetic API fixture; real frontend and authentication; no live AI",
+      "status": "passed",
+      "test": "desktop-chromium › results.spec.ts › findings support URL filters, evidence, review persistence and report exports",
+      "project": "desktop-chromium",
+      "screenshot": "screenshots/2026-09-23T11-32-49-881Z-59eaa4f8/007-results-reviewed-conclusion-desktop-chromium.png"
+    },
+    {
+      "name": "Analysis · Explicit saved-result translation",
+      "description": "Translation is requested explicitly; translated reports preserve original source quotations and review revision.",
+      "route": "/analyses/10000000-0000-4000-8000-000000000001?tab=conclusion",
+      "viewport": "1440 × 1000",
+      "dataSource": "Synthetic API fixture; real frontend and authentication; no live AI",
+      "status": "passed",
+      "test": "desktop-chromium › results.spec.ts › language changes do not run AI and explicit translations expire after review changes",
+      "project": "desktop-chromium",
+      "screenshot": "screenshots/2026-09-23T11-32-49-881Z-59eaa4f8/008-results-translated-conclusion-desktop-chromium.png"
+    },
+    {
+      "name": "Analysis · Running",
+      "description": "An active run shows its current stage and coverage while polling for completion; unavailable findings are hidden.",
+      "route": "/analyses/10000000-0000-4000-8000-000000000001",
+      "viewport": "1440 × 1000",
+      "dataSource": "Synthetic API fixture; real frontend and authentication; no live AI",
+      "status": "passed",
+      "test": "desktop-chromium › results.spec.ts › active runs poll and failed runs explain why results are unavailable",
+      "project": "desktop-chromium",
+      "screenshot": "screenshots/2026-09-23T11-32-49-881Z-59eaa4f8/009-results-running-desktop-chromium.png"
+    },
+    {
+      "name": "Analysis · Failed run and coverage",
+      "description": "Failure details and incomplete coverage are visible, with a new-draft retry action instead of invented results.",
+      "route": "/analyses/10000000-0000-4000-8000-000000000001",
+      "viewport": "1440 × 1000",
+      "dataSource": "Synthetic API fixture; real frontend and authentication; no live AI",
+      "status": "passed",
+      "test": "desktop-chromium › results.spec.ts › active runs poll and failed runs explain why results are unavailable",
+      "project": "desktop-chromium",
+      "screenshot": "screenshots/2026-09-23T11-32-49-881Z-59eaa4f8/010-results-failed-desktop-chromium.png"
+    },
+    {
+      "name": "Comparison history",
+      "description": "Saved comparisons from PostgreSQL with draft status, search, status filtering and navigation.",
+      "route": "/",
+      "viewport": "1440 × 1000",
+      "dataSource": "Live local PostgreSQL and FastAPI; official DOCX seed",
+      "status": "passed",
+      "test": "desktop-chromium › workspace.spec.ts › official history, parsing consent and exact source preview",
+      "project": "desktop-chromium",
+      "screenshot": "screenshots/2026-09-23T11-32-49-881Z-59eaa4f8/011-comparison-history-desktop-chromium.png"
+    },
+    {
+      "name": "Official DOCX comparison draft",
+      "description": "Revision 8 and 9 input files, parsing warnings and required consent for a partial analysis. No AI run is started.",
+      "route": "/new?analysis=e8448c34-b056-4db6-b59b-98793a52765c",
+      "viewport": "1440 × 1000",
+      "dataSource": "Live local PostgreSQL and FastAPI; official DOCX seed",
+      "status": "passed",
+      "test": "desktop-chromium › workspace.spec.ts › official history, parsing consent and exact source preview",
+      "project": "desktop-chromium",
+      "screenshot": "screenshots/2026-09-23T11-32-49-881Z-59eaa4f8/012-official-draft-desktop-chromium.png"
+    },
+    {
+      "name": "Original source preview",
+      "description": "Searchable original Russian wording and clause identifiers remain intact while the interface is in English.",
+      "route": "/new?analysis=e8448c34-b056-4db6-b59b-98793a52765c",
+      "viewport": "1440 × 1000",
+      "dataSource": "Live local PostgreSQL and FastAPI; official DOCX seed",
+      "status": "passed",
+      "test": "desktop-chromium › workspace.spec.ts › official history, parsing consent and exact source preview",
+      "project": "desktop-chromium",
+      "screenshot": "screenshots/2026-09-23T11-32-49-881Z-59eaa4f8/013-original-source-preview-desktop-chromium.png"
+    },
+    {
+      "name": "New comparison",
+      "description": "A named draft starts the Before/After document preparation workflow.",
+      "route": "/new",
+      "viewport": "1440 × 1000",
+      "dataSource": "Live local application; empty form before creating a synthetic test draft",
+      "status": "passed",
+      "test": "desktop-chromium › workspace.spec.ts › create a draft, upload both sides, revise, move and remove documents",
+      "project": "desktop-chromium",
+      "screenshot": "screenshots/2026-09-23T11-32-49-881Z-59eaa4f8/014-new-comparison-desktop-chromium.png"
+    },
+    {
+      "name": "Prepared Before/After documents",
+      "description": "Real Markdown uploads, saved revision labels and parsed source counts; both sides are ready without calling AI.",
+      "route": "/new?analysis=0954425e-326a-4036-96d0-c43de03bc02a",
+      "viewport": "1440 × 1000",
+      "dataSource": "Live local PostgreSQL and FastAPI; explicitly synthetic uploaded Markdown, removed after this test",
+      "status": "passed",
+      "test": "desktop-chromium › workspace.spec.ts › create a draft, upload both sides, revise, move and remove documents",
+      "project": "desktop-chromium",
+      "screenshot": "screenshots/2026-09-23T11-32-49-881Z-59eaa4f8/015-prepared-synthetic-draft-desktop-chromium.png"
+    },
+    {
+      "name": "Mobile history",
+      "description": "Comparison history remains usable on a 390-pixel mobile viewport.",
+      "route": "/",
+      "viewport": "390 × 844",
+      "dataSource": "Live local FastAPI and PostgreSQL",
+      "status": "passed",
+      "test": "mobile-chromium › mobile.spec.ts › mobile navigation, notifications and persistent RU/KK/EN selection",
+      "project": "mobile-chromium",
+      "screenshot": "screenshots/2026-09-23T11-32-49-881Z-59eaa4f8/016-mobile-history-mobile-chromium.png"
+    },
+    {
+      "name": "Mobile navigation",
+      "description": "The side sheet exposes history, new comparison and sign-out on small screens.",
+      "route": "/",
+      "viewport": "390 × 844",
+      "dataSource": "Real frontend navigation and authenticated session",
+      "status": "passed",
+      "test": "mobile-chromium › mobile.spec.ts › mobile navigation, notifications and persistent RU/KK/EN selection",
+      "project": "mobile-chromium",
+      "screenshot": "screenshots/2026-09-23T11-32-49-881Z-59eaa4f8/017-mobile-navigation-mobile-chromium.png"
+    },
+    {
+      "name": "New comparison — Kazakh mobile UI",
+      "description": "The Kazakh interface persists after reload, including mobile form and navigation labels.",
+      "route": "/new",
+      "viewport": "390 × 844",
+      "dataSource": "Real frontend locale persistence",
+      "status": "passed",
+      "test": "mobile-chromium › mobile.spec.ts › mobile navigation, notifications and persistent RU/KK/EN selection",
+      "project": "mobile-chromium",
+      "screenshot": "screenshots/2026-09-23T11-32-49-881Z-59eaa4f8/018-mobile-new-kk-mobile-chromium.png"
+    }
+  ],
+  "errors": []
+}
